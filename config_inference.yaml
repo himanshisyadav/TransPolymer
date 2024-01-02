@@ -7,15 +7,15 @@ model_indicator: 'pretrain'                        # whether to use pretrained m
 aug_indicator:                                     # number of augmentation per SMILES. If no limitation, assign the indicator with None (leave it blank).
 
 vocab_sup_file: 'data/vocab/vocab_sup_PE_I.csv'           # supplementary vocab file path
-train_file: './data/ood_all_pipe.csv' 
-test_file: './data/ood_all_pipe.csv'                     # test file path if cross-validation is not used
+train_file: './data/freqI_train.csv' 
+test_file: './data/freqI_test.csv'                     # test file path if cross-validation is not used
 model_path: 'ckpt/pretrain.pt'                      # pretrain model path
-best_model_path: 'ckpt/random_train_all_pipe_old_vocab.pt'          # best model save path
+best_model_path: 'ckpt/random_train_all_dollar_old_vocab_best_model.pt'          # best model save path
 
 k: 5                                                # k-fold cross-validation
 blocksize: 411                                      # max length of sequences after tokenization
 batch_size: 16                                      # batch size
-num_epochs: 50                                      # total number of epochs
+num_epochs: 25                                     # total number of epochs
 warmup_ratio: 0.05                                  # warmup ratio
 drop_rate: 0.1                                      # dropout
 lr_rate: 0.00005                                    # initial lr for LLRD and pretrained model lr otherwise

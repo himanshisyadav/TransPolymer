@@ -5,3 +5,4 @@ runs/
 plots/
 ckpt/
 data/electrolyte-data
+data/
