@@ -36,6 +36,7 @@ writer = SummaryWriter()
 from copy import deepcopy
 
 import pdb
+import seaborn as sns
 
 np.random.seed(seed=1)
 
@@ -172,6 +173,19 @@ def test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, s
         r2_test = r2score(test_pred.flatten().to("cpu"), test_true.flatten().to("cpu")).item()
         print("test RMSE = ", np.sqrt(test_loss))
         print("test r^2 = ", r2_test)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.plot(test_true,test_pred, 'o', color = 'green', markersize = '1')
+    xl, xr = ax.get_xlim()
+    yt, yb = ax.get_ylim()
+    left = xl + 0.5
+    top = yt + 0.5
+    m, b = np.polyfit(test_true.flatten(), test_pred.flatten(), 1)
+    ax.plot(test_true, m*test_true+b, color='red')
+    ax.text(left,top, 'RMSE=' + str(round(np.sqrt(test_loss),3)) + ' R2=' + str(round(r2_test,3)) , ha='left', va='top')
+    file_name = "./plots/inference_plot_rmse_" + str(np.sqrt(test_loss)) + "_r2_" + str(r2_test) + ".png"
+    plt.savefig(file_name)
 
     writer.add_scalar("Loss/test", test_loss, epoch)
     writer.add_scalar("r^2/test", r2_test, epoch)

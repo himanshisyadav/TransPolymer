@@ -23,22 +23,22 @@ def smiles_and_temp(num_file, smiles_file, output_file):
     df_input_final.to_csv(output_file, index = False)
 
 def exp_2():
-    df_num = pd.read_csv("./data/all_multi_comp_add.csv")
-    df_smiles = pd.read_csv("./data/all_multi_comp.csv")
+    df_num = pd.read_csv("./data/ood_multi_comp_add.csv")
+    df_smiles = pd.read_csv("./data/ood_multi_comp_comb.csv")
     df_smiles.fillna('NAN_SMILES', inplace=True)
     df_input = pd.concat([df_num, df_smiles], axis = 1)
     df_input = df_input.applymap(str)
     df_input_final = pd.DataFrame()
-    df_input_final['input'] = df_input[['solv_ratio_1', 'solv_ratio_2', 'solv_ratio_3', 'solv_ratio_4', 'mol_wt_solv_1', 'mol_wt_solv_2', 'mol_wt_solv_3', 'mol_wt_solv_4', 'conc_salt', 'temperature', 'solv_1_sm', 'solv_2_sm', 'solv_3_sm','solv_4_sm', 'salt_sm']].apply("$".join, axis=1)
+    df_input_final['input'] = df_input[['solv_ratio_1', 'solv_ratio_2', 'solv_ratio_3', 'solv_ratio_4', 'mol_wt_solv_1', 'mol_wt_solv_2', 'mol_wt_solv_3', 'mol_wt_solv_4', 'conc_salt', 'temperature', 'solv_comb_sm', 'salt_sm']].apply("$".join, axis=1)
     df_input_final['conductivity_log'] = df_input['conductivity_log']
 
     train, test = train_test_split(df_input_final, test_size=0.2)
 
     print(train.shape[0], test.shape[0])
 
-    df_input_final.to_csv("./data/our_combined.csv", index = False)
-    train.to_csv("./data/our_train_combined.csv", index = False)
-    test.to_csv("./data/our_test_combined.csv", index = False)
+    df_input_final.to_csv("./data/ood.csv", index = False)
+    # train.to_csv("./data/our_train_combined.csv", index = False)
+    # test.to_csv("./data/our_test_combined.csv", index = False)
 
 def exp_3(num_file, smiles_file, output_file):
     df_num = pd.read_csv(num_file)
@@ -69,7 +69,7 @@ def exp_4(num_file, smiles_file, output_file):
 
 
 def main():
-    exp_4( "./data/random_val_multi_add.csv", "./data/random_val_multi_comp.csv", "./data/random_val_transpolymer_seq.csv")
+    exp_2()
 
 if __name__ == "__main__":
     main()

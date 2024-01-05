@@ -6,7 +6,7 @@ aug_special_flag: False                            # whether to augment copolyme
 model_indicator: 'pretrain'                        # whether to use pretrained model
 aug_indicator:                                     # number of augmentation per SMILES. If no limitation, assign the indicator with None (leave it blank).
 
-vocab_sup_file: 'data/vocab/vocab_sup_PE_I.csv'           # supplementary vocab file path
+vocab_sup_file: 'data/vocab/vocab_random_train_decimal_2.csv'           # supplementary vocab file path
 train_file: 'data/random_train_smiles_temp.csv'                  # train file path
 test_file: 'data/random_test_smiles_temp.csv'                     # test file path if cross-validation is not used
 model_path: 'ckpt/pretrain.pt'                      # pretrain model path
