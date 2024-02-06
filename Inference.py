@@ -37,6 +37,7 @@ from copy import deepcopy
 
 import pdb
 import seaborn as sns
+from sklearn.metrics import mean_absolute_error as mae 
 
 np.random.seed(seed=1)
 
@@ -169,10 +170,14 @@ def test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, s
             test_pred = torch.cat([test_pred.to(device), outputs.to(device)])
             test_true = torch.cat([test_true.to(device), prop.to(device)])
 
+        # pdb.set_trace()
+
         test_loss = test_loss / len(test_pred.flatten())
         r2_test = r2score(test_pred.flatten().to("cpu"), test_true.flatten().to("cpu")).item()
+        mae_error_test = mae(test_true.flatten().to("cpu"), test_pred.flatten().to("cpu")) 
         print("test RMSE = ", np.sqrt(test_loss))
         print("test r^2 = ", r2_test)
+        print("test MAE =", mae_error_test)
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -394,7 +399,7 @@ if __name__ == "__main__":
     if finetune_config['model_indicator'] == 'pretrain':
         print("Use the pretrained model")
         PretrainedModel = RobertaModel.from_pretrained(finetune_config['model_path'])
-        tokenizer = PolymerSmilesTokenizer.from_pretrained("/project/rcc/hyadav/ChemBERTa-77M-MLM", max_len=finetune_config['blocksize'])
+        tokenizer = PolymerSmilesTokenizer.from_pretrained("/project/rcc/hyadav/roberta-base", max_len=finetune_config['blocksize'])
         PretrainedModel.config.hidden_dropout_prob = finetune_config['hidden_dropout_prob']
         PretrainedModel.config.attention_probs_dropout_prob = finetune_config['attention_probs_dropout_prob']
     else:

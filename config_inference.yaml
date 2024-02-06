@@ -6,11 +6,11 @@ aug_special_flag: False                            # whether to augment copolyme
 model_indicator: 'pretrain'                        # whether to use pretrained model
 aug_indicator:                                     # number of augmentation per SMILES. If no limitation, assign the indicator with None (leave it blank).
 
-vocab_sup_file: 'data/vocab/vocab_sup_PE_I.csv'           # supplementary vocab file path
-train_file: './data/ood.csv' 
-test_file: './data/ood.csv'                     # test file path if cross-validation is not used
+vocab_sup_file: 'data/vocab/vocab_sup_PE_I_rxnmapper.csv'           # supplementary vocab file path
+train_file: './data/ood_exact_paper_seq_all_solvs.csv' 
+test_file: './data/ood_exact_paper_seq_all_solvs.csv'                     # test file path if cross-validation is not used
 model_path: 'ckpt/pretrain.pt'                      # pretrain model path
-best_model_path: 'ckpt/random_train_all_dollar_old_vocab_best_model.pt'          # best model save path
+best_model_path: 'ckpt/random_train_exact_paper_seq_vocab_sup_PE_I_rxnmapper_best_model.pt'          # best model save path
 
 k: 5                                                # k-fold cross-validation
 blocksize: 411                                      # max length of sequences after tokenization

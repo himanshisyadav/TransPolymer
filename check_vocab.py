@@ -19,7 +19,7 @@ def check_smiles():
 
 def check_discrete():
     vocab = pd.read_csv('./data/vocab/vocab_sup_PE_I.csv')
-    random_train = pd.read_csv("./data/random_train_multi_add.csv")
+    random_train = pd.read_csv("./data/random_train_multi_add_quantile.csv")
     random_train = random_train.round(2)
 
     random_train['combined'] = random_train['solv_ratio_1'] + random_train['solv_ratio_2'] + random_train['solv_ratio_3'] + random_train['solv_ratio_4'] + random_train['mol_wt_solv_1'] + random_train['mol_wt_solv_2'] + random_train['mol_wt_solv_3'] + random_train['mol_wt_solv_4'] + random_train['conc_salt'] + random_train['temperature']
@@ -30,7 +30,8 @@ def check_discrete():
     diff = np.setdiff1d(random_train_unique_list, vocab_unique_list)
     new_vocab = list(set(random_train_unique_list) | set(vocab_unique_list))
     df = pd.DataFrame(new_vocab)
-    df.to_csv('./data/vocab/vocab_random_train_decimal_2.csv', index=False)
+    df_with_formatted_floats = df.applymap(lambda x: '{:.2f}'.format(x) if isinstance(x, float) else x)
+    df_with_formatted_floats.to_csv('./data/vocab/vocab_random_train_decimal_2_quantile.csv', index=False)
 
 
 

@@ -222,7 +222,8 @@ class PolymerSmilesTokenizer(PreTrainedTokenizer):
 
         # Should have added re.IGNORECASE so BPE merges can happen for capitalized versions of contractions
         """Regex for SMILES"""
-        smi_regex_pattern = r"(\-?[0-9]+\.?[0-9]*|\[|\]|SELF|Li|Be|Na|Mg|Al|K|Ca|Co|Zn|Ga|F|S|Ge|As|Se|C|Sn|Te|N|O|P|H|I|b|c|n|o|s|p|Br?|B|Cl?|Fe?|Ni?|Si?|\||\(|\)|\^|=|#|-|\+|\\|\/|@|\*|\.|\%|\$)"
+        smi_regex_pattern = r"(\[[^\]]+]|Br?|Cl?|N|O|S|P|F|I|b|c|n|o|s|p|\(|\)|\.|=|#|-|\+|\\|\/|:|~|@|\?|>>?|\*|\$|\%[0-9]{2}|[0-9])" #RXN Mapper smiles
+        # smi_regex_pattern = r"(\-?[0-9]+\.?[0-9]*|\[|\]|SELF|Li|Be|Na|Mg|Al|K|Ca|Co|Zn|Ga|F|S|Ge|As|Se|C|Sn|Te|N|O|P|H|I|b|c|n|o|s|p|Br?|B|Cl?|Fe?|Ni?|Si?|\||\(|\)|\^|=|#|-|\+|\\|\/|@|\*|\.|\%|\$)"
         self.pat = re.compile(smi_regex_pattern)
 
     @property
