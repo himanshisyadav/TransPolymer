@@ -76,6 +76,11 @@ def main(tsne_config):
     # Nc_data = emb_convert(tsne_config['Nc_path'], tokenizer, config)
     # OPV_data = emb_convert(tsne_config['OPV_path'], tokenizer, config)
     # Liq_data = emb_convert(tsne_config['Liq_path'], tokenizer, config)
+    random_data = emb_convert(tsne_config['random_path'], tokenizer, config)
+    freqI_data = emb_convert(tsne_config['freqI_path'], tokenizer, config)
+    freqII_data = emb_convert(tsne_config['freqII_path'], tokenizer, config)
+    OOD_data = emb_convert(tsne_config['OOD_path'], tokenizer, config)
+
 
     print("start fitting t-SNE")
     tSNE = TSNE(
@@ -96,7 +101,11 @@ def main(tsne_config):
     # EPS_tSNE = pretrain_tSNE.transform(EPS_data)
     # Nc_tSNE = pretrain_tSNE.transform(Nc_data)
     # OPV_tSNE = pretrain_tSNE.transform(OPV_data)
-    # Liq_tSNE = pretrain_tSNE.transform(Liq_data)
+    random_tSNE = pretrain_tSNE.transform(random_data)
+    freqI_tSNE = pretrain_tSNE.transform(freqI_data)
+    freqII_tSNE = pretrain_tSNE.transform(freqII_data)
+    OOD_tSNE = pretrain_tSNE.transform(OOD_data)
+
     print("finish t-SNE")
 
     fig, ax = plt.subplots(figsize=(15, 15))
@@ -112,8 +121,10 @@ def main(tsne_config):
     # ax.scatter(EPS_tSNE[:, 0], EPS_tSNE[:, 1], s=50, edgecolors='None', linewidths=0.4, c='blue', label=tsne_config["EPS_label"])
     # ax.scatter(Nc_tSNE[:, 0], Nc_tSNE[:, 1], s=50, edgecolors='None', linewidths=0.4, c='violet', label=tsne_config["Nc_label"])
     # ax.scatter(OPV_tSNE[:, 0], OPV_tSNE[:, 1], s=50, edgecolors='None', linewidths=0.4, c='deeppink', label=tsne_config["OPV_label"])
-    # ax.scatter(Liq_tSNE[:, 0], Liq_tSNE[:, 1], s=50, edgecolors='None', linewidths=0.4, c='crimson', label=tsne_config["Liq_label"])
- 
+    ax.scatter(random_tSNE[:, 0], random_tSNE[:, 1], s=50, edgecolors='None', linewidths=0.4, c='crimson', label=tsne_config["Random_label"])
+    ax.scatter(freqI_tSNE[:, 0], freqI_tSNE[:, 1], s=50, edgecolors='None', linewidths=0.4, c='crimson', label=tsne_config["ClusterI_label"])
+    ax.scatter(freqII_tSNE[:, 0], freqII_tSNE[:, 1], s=50, edgecolors='None', linewidths=0.4, c='crimson', label=tsne_config["ClusterII_label"])
+    ax.scatter(OOD_tSNE[:, 0], OOD_tSNE[:, 1], s=50, edgecolors='None', linewidths=0.4, c='crimson', label=tsne_config["OOD_label"]) 
     ax.set_xticks([])
     ax.set_yticks([])
 

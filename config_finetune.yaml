@@ -7,22 +7,22 @@ model_indicator: 'pretrain'                        # whether to use pretrained m
 aug_indicator:                                     # number of augmentation per SMILES. If no limitation, assign the indicator with None (leave it blank).
 
 vocab_sup_file: 'data/vocab/vocab_sup_PE_I.csv'           # supplementary vocab file path
-train_file: 'data/random_train_exact_paper_seq.csv'                  # train file path
-test_file: 'data/random_test_exact_paper_seq.csv'                     # test file path if cross-validation is not used
+train_file: './data/freqI_train_temp_first_token_salt_next_all_scaled.csv'                  # train file path
+test_file: './data/freqI_test_temp_first_token_salt_next_all_scaled.csv'                     # test file path if cross-validation is not used
 model_path: 'ckpt/pretrain.pt'                      # pretrain model path
-save_path: 'ckpt/random_train_exact_paper_seq_vocab_sup_PE_I_test_concat.pt'                     # checkpoint path
-best_model_path: 'ckpt/random_train_exact_paper_seq_vocab_sup_PE_I_best_model_test_concat.pt'          # best model save path
+save_path: 'ckpt/freqI_all_scaled_pooling_temp_first_token_salt_next_exact_paper_seq_common_log_vocab_sup_PE_I_epoch_70_roberta_old_regex_drop_rate_01_tolerance_10.pt'                     # checkpoint path
+best_model_path: 'ckpt/freqI_all_scaled_pooling_temp_first_token_salt_next_exact_paper_seq_common_log_vocab_sup_PE_I_epoch_70_roberta_old_regex_drop_rate_01_tolerance_10.pt'          # best model save path
 
 k: 5                                                # k-fold cross-validation
 blocksize: 411                                      # max length of sequences after tokenization
 batch_size: 16                                      # batch size
-num_epochs: 50                                      # total number of epochs
+num_epochs: 70                                      # total number of epochs
 warmup_ratio: 0.05                                  # warmup ratio
 drop_rate: 0.1                                      # dropout
 lr_rate: 0.00005                                    # initial lr for LLRD and pretrained model lr otherwise
-lr_rate_reg: 0.0001                                 # regressor lr if LLRD is not used
+lr_rate_reg: 0.00001                                 # regressor lr if LLRD is not used
 weight_decay: 0.01
 hidden_dropout_prob: 0.1                            # hidden layer dropout
-attention_probs_dropout_prob: 0.1                   # attention dropout
-tolerance: 5                                        # tolerance of no improvement in performance before early stop
+attention_probs_dropout_prob: 0.1                  # attention dropout
+tolerance: 10                                        # tolerance of no improvement in performance before early stop
 num_workers: 8         

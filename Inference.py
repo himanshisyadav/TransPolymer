@@ -108,12 +108,19 @@ def roberta_base_AdamW_LLRD(model, lr, weight_decay):
     return AdamW(opt_parameters, lr=lr)
 
 """Model"""
+class GlobalAveragePooling1D(nn.Module):
+    def __init__(self):
+        super(GlobalAveragePooling1D, self).__init__()
+
+    def forward(self, x):
+        return torch.mean(x, dim=1)
 
 class DownstreamRegression(nn.Module):
     def __init__(self, drop_rate=0.1):
         super(DownstreamRegression, self).__init__()
         self.PretrainedModel = deepcopy(PretrainedModel)
         self.PretrainedModel.resize_token_embeddings(len(tokenizer))
+        self.pooler = GlobalAveragePooling1D()
         
         self.Regressor = nn.Sequential(
             nn.Dropout(drop_rate),
@@ -124,7 +131,13 @@ class DownstreamRegression(nn.Module):
 
     def forward(self, input_ids, attention_mask):
         outputs = self.PretrainedModel(input_ids=input_ids, attention_mask=attention_mask)
-        logits = outputs.last_hidden_state[:, 0, :]
+        # logits = outputs.last_hidden_state[:, 0, :]
+
+        #Trying Global Average Pooling
+        last_hidden_state = outputs.last_hidden_state[:,:,:]
+        pooled_output = self.pooler(last_hidden_state)
+        logits = pooled_output
+
         output = self.Regressor(logits)
         return output
 
@@ -175,9 +188,11 @@ def test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, s
         test_loss = test_loss / len(test_pred.flatten())
         r2_test = r2score(test_pred.flatten().to("cpu"), test_true.flatten().to("cpu")).item()
         mae_error_test = mae(test_true.flatten().to("cpu"), test_pred.flatten().to("cpu")) 
+        # pdb.set_trace()
         print("test RMSE = ", np.sqrt(test_loss))
         print("test r^2 = ", r2_test)
         print("test MAE =", mae_error_test)
+        
 
     fig = plt.figure()
     ax = fig.add_subplot(111)

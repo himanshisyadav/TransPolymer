@@ -10,6 +10,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.clip_grad import clip_grad_norm
+import torchinfo
 
 from transformers import AdamW, get_linear_schedule_with_warmup, RobertaModel, RobertaConfig, RobertaTokenizer
 
@@ -106,11 +107,19 @@ def roberta_base_AdamW_LLRD(model, lr, weight_decay):
 
 """Model"""
 
+class GlobalAveragePooling1D(nn.Module):
+    def __init__(self):
+        super(GlobalAveragePooling1D, self).__init__()
+
+    def forward(self, x):
+        return torch.mean(x, dim=1)
+
 class DownstreamRegression(nn.Module):
     def __init__(self, drop_rate=0.1):
         super(DownstreamRegression, self).__init__()
         self.PretrainedModel = deepcopy(PretrainedModel)
         self.PretrainedModel.resize_token_embeddings(len(tokenizer))
+        self.pooler = GlobalAveragePooling1D()
         
         self.Regressor = nn.Sequential(
             nn.Dropout(drop_rate),
@@ -121,7 +130,14 @@ class DownstreamRegression(nn.Module):
 
     def forward(self, input_ids, attention_mask):
         outputs = self.PretrainedModel(input_ids=input_ids, attention_mask=attention_mask)
-        logits = outputs.last_hidden_state[:, 0, :]
+        
+        # logits = outputs.last_hidden_state[:, 0, :]
+
+        #Trying Global Average Pooling
+        last_hidden_state = outputs.last_hidden_state[:,:,:]
+        pooled_output = self.pooler(last_hidden_state)
+        logits = pooled_output
+
         output = self.Regressor(logits)
         return output
 
@@ -438,7 +454,7 @@ if __name__ == "__main__":
     if finetune_config['model_indicator'] == 'pretrain':
         print("Use the pretrained model")
         PretrainedModel = RobertaModel.from_pretrained(finetune_config['model_path'])
-        tokenizer = PolymerSmilesTokenizer.from_pretrained("/project/rcc/hyadav/ChemBERTa-77M-MLM", max_len=finetune_config['blocksize'])
+        tokenizer = PolymerSmilesTokenizer.from_pretrained("/project/rcc/hyadav/roberta-base", max_len=finetune_config['blocksize'])
         PretrainedModel.config.hidden_dropout_prob = finetune_config['hidden_dropout_prob']
         PretrainedModel.config.attention_probs_dropout_prob = finetune_config['attention_probs_dropout_prob']
     else:
