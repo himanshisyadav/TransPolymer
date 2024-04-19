@@ -62,7 +62,8 @@ class Downstream_Dataset(Dataset):
     def __getitem__(self, i):
         data_row = self.dataset.iloc[i]
         seq = data_row[0]
-        prop = data_row[1]
+        temp = data_row[1]
+        prop = data_row[2]
 
         encoding = self.tokenizer(
             str(seq),
@@ -78,6 +79,7 @@ class Downstream_Dataset(Dataset):
         return dict(
             input_ids=encoding["input_ids"].flatten(),
             attention_mask=encoding["attention_mask"].flatten(),
+            temp = temp,
             prop=prop
         )
 

@@ -10,6 +10,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.clip_grad import clip_grad_norm
+import torch.nn.functional as F
 
 from transformers import AdamW, get_linear_schedule_with_warmup, RobertaModel, RobertaConfig, RobertaTokenizer
 
@@ -37,6 +38,7 @@ writer = SummaryWriter()
 from copy import deepcopy
 
 np.random.seed(seed=1)
+import torchinfo
 
 """Layer-wise learning rate decay"""
 
@@ -105,24 +107,121 @@ def roberta_base_AdamW_LLRD(model, lr, weight_decay):
     return AdamW(opt_parameters, lr=lr)
 
 """Model"""
+class GlobalAveragePooling1D(nn.Module):
+    def __init__(self):
+        super(GlobalAveragePooling1D, self).__init__()
+
+    def forward(self, x):
+        return torch.mean(x, dim=1)
 
 class DownstreamRegression(nn.Module):
     def __init__(self, drop_rate=0.1):
         super(DownstreamRegression, self).__init__()
         self.PretrainedModel = deepcopy(PretrainedModel)
         self.PretrainedModel.resize_token_embeddings(len(tokenizer))
+        self.pooler = GlobalAveragePooling1D()
+
+        self.attention_dim = 200
+        self.constant_dim = 1
+        self.embedding_dim = self.PretrainedModel.config.hidden_size
+
+        #Attention 
+        # self.fc_embed = nn.Linear(self.embedding_dim, self.attention_dim)
+        # self.fc_const = nn.Linear(self.constant_dim, self.attention_dim)
+        # self.fc_out = nn.Linear(self.attention_dim, self.embedding_dim + self.constant_dim)
+
+        #Fusion        
+        # self.fusion = torch.nn.Linear(self.PretrainedModel.config.hidden_size + self.constant_dim, self.PretrainedModel.config.hidden_size + self.constant_dim)
+        # self.relu = torch.nn.ReLU()
+        # self.dropout = torch.nn.Dropout(drop_rate)
+
+        #Fusion 2
+        self.hidden_dim = 256
+        self.linear_text = nn.Linear(self.PretrainedModel.config.hidden_size, self.hidden_dim)
+        self.linear_numeric = nn.Linear(self.constant_dim, self.hidden_dim)
+
+        self.output_layer = nn.Linear(self.hidden_dim, self.PretrainedModel.config.hidden_size + self.constant_dim) 
         
         self.Regressor = nn.Sequential(
+        #     nn.Dropout(drop_rate),
+        #     nn.Linear(self.PretrainedModel.config.hidden_size + self.constant_dim, self.PretrainedModel.config.hidden_size + self.constant_dim),
+        #     nn.SiLU(),
+        #     nn.Linear(self.PretrainedModel.config.hidden_size + self.constant_dim, 1)
+        # )
             nn.Dropout(drop_rate),
-            nn.Linear(self.PretrainedModel.config.hidden_size, self.PretrainedModel.config.hidden_size),
-            nn.SiLU(),
-            nn.Linear(self.PretrainedModel.config.hidden_size, 1)
+            nn.Linear(self.PretrainedModel.config.hidden_size + self.constant_dim, 1),
         )
+        #     nn.Dropout(drop_rate),
+        #     nn.Linear(self.PretrainedModel.config.hidden_size + self.constant_dim, 128),
+        #     nn.Dropout(drop_rate),
+        #     nn.Linear(128, 64),
+        #     nn.Dropout(drop_rate),
+        #     nn.Linear(64, 1)
+        # )
 
-    def forward(self, input_ids, attention_mask):
+    def forward(self, input_ids, attention_mask, temp):
         outputs = self.PretrainedModel(input_ids=input_ids, attention_mask=attention_mask)
-        logits = outputs.last_hidden_state[:, 0, :]
-        output = self.Regressor(logits)
+        # Using <s> token
+        # logits = outputs.last_hidden_state[:, 0, :]
+        
+        # Global Average Pooling
+        last_hidden_state = outputs.last_hidden_state[:,:,:]
+        pooled_output = self.pooler(last_hidden_state)
+        logits = pooled_output
+
+        # Getting Temperature Values 
+        temp = temp.reshape(-1, 1).float()
+
+        ## Attention Code
+        # embedding = logits.double() # 16 by 768
+        # constant = temp.double() # 16 by 1
+
+        # embed_attention = F.softmax(torch.tanh(self.fc_embed(embedding)), dim=1) # 16 by 200
+        # const_attention = F.softmax(torch.tanh(self.fc_const(constant)), dim=1) # 16 by 200
+        
+        # # Weighted sum of embeddings and constant values
+        # embedding= embedding[:, :self.attention_dim]
+        # embed_weighted = embedding * embed_attention # 16 by 768 mul 16 by 200
+        # const_weighted = constant * const_attention # 16 by 1 mul 16 by 200
+
+        # combined = embed_weighted + const_weighted
+        # fused = self.fc_out(combined)
+
+        ## Non-attention Code
+        # concated_data = torch.cat((logits, temp), dim=1)
+        # fused = self.dropout(self.relu(self.fusion(concated_data)))
+
+        ##Fusion 2
+        # text_input = logits.double()
+        # numeric_input = temp.double()
+        # # Process text input
+        # text_output = F.relu(self.linear_text(text_input))
+        
+        # # Process numeric input
+        # numeric_output = F.relu(self.linear_numeric(numeric_input))
+        
+        # # Compute mean fusion
+        # fusion_output = (text_output + numeric_output) / 2
+        # fused = self.output_layer(fusion_output)
+
+        # Fusion 3: Simple Linear Fusion
+        text_input = logits.double()
+        numeric_input = temp.double()
+        # Process text input
+        text_output = self.linear_text(text_input)
+        
+        # Process numeric input
+        numeric_output = self.linear_numeric(numeric_input)
+        
+        # Compute mean fusion
+        fusion_output = (text_output + numeric_output) / 2
+        fused = self.output_layer(fusion_output)
+
+        #Max Fusion
+        # fused = self.output_layer(torch.maximum(text_output,numeric_output))
+
+        #Regression 
+        output = self.Regressor(fused)
         return output
 
 """Train"""
@@ -136,9 +235,12 @@ def train(model, optimizer, scheduler, loss_fn, train_dataloader, device):
     for step, batch in enumerate(train_dataloader):
         input_ids = batch["input_ids"].to(device)
         attention_mask = batch["attention_mask"].to(device)
+        temp = batch["temp"].to(device).float()
         prop = batch["prop"].to(device).float()
+        # torchinfo.summary(model, verbose = 1)
         optimizer.zero_grad()
-        outputs = model(input_ids, attention_mask).float()
+        outputs = model(input_ids, attention_mask, temp).float()
+        # pdb.set_trace()
         loss = loss_fn(outputs.squeeze(), prop.squeeze())
         loss.backward()
         optimizer.step()
@@ -161,11 +263,13 @@ def test(model, loss_fn, train_dataloader, test_dataloader, device, scaler, opti
             input_ids = batch["input_ids"].to(device)
             attention_mask = batch["attention_mask"].to(device)
             prop = batch["prop"].to(device).float()
-            outputs = model(input_ids, attention_mask).float()
+            temp = batch["temp"].to(device).float()
+            outputs = model(input_ids, attention_mask, temp).float()
             outputs = torch.from_numpy(scaler.inverse_transform(outputs.cpu().reshape(-1, 1)))
             prop = torch.from_numpy(scaler.inverse_transform(prop.cpu().reshape(-1, 1)))
             loss = loss_fn(outputs.squeeze(), prop.squeeze())
             train_loss += loss.item() * len(prop)
+            # print("Train Loss: ", train_loss)
             train_pred = torch.cat([train_pred.to(device), outputs.to(device)])
             train_true = torch.cat([train_true.to(device), prop.to(device)])
 
@@ -178,7 +282,8 @@ def test(model, loss_fn, train_dataloader, test_dataloader, device, scaler, opti
             input_ids = batch["input_ids"].to(device)
             attention_mask = batch["attention_mask"].to(device)
             prop = batch["prop"].to(device).float()
-            outputs = model(input_ids, attention_mask).float()
+            temp = batch["temp"].to(device).float()
+            outputs = model(input_ids, attention_mask, temp).float()
             outputs = torch.from_numpy(scaler.inverse_transform(outputs.cpu().reshape(-1, 1)))
             prop = torch.from_numpy(scaler.inverse_transform(prop.cpu().reshape(-1, 1)))
             loss = loss_fn(outputs.squeeze(), prop.squeeze())
@@ -199,6 +304,8 @@ def test(model, loss_fn, train_dataloader, test_dataloader, device, scaler, opti
     state = {'model': model.state_dict(), 'optimizer': optimizer.state_dict(), 'scheduler': scheduler.state_dict(),
              'epoch': epoch}
     torch.save(state, finetune_config['save_path'])
+
+    
 
     return train_loss, test_loss, r2_train, r2_test
 
@@ -262,6 +369,7 @@ def main(finetune_config):
                 train_data = DataAug.combine_columns(train_data)
                 test_data = DataAug.combine_columns(test_data)
 
+            
             scaler = StandardScaler()
             train_data.iloc[:, 1] = scaler.fit_transform(train_data.iloc[:, 1].values.reshape(-1, 1))
             test_data.iloc[:, 1] = scaler.transform(test_data.iloc[:, 1].values.reshape(-1, 1))
@@ -279,7 +387,8 @@ def main(finetune_config):
             """Train the model"""
             model = DownstreamRegression(drop_rate=finetune_config['drop_rate']).to(device)
             model = model.double()
-            loss_fn = nn.MSELoss()
+            # loss_fn = nn.MSELoss()
+            loss_fn = nn.HuberLoss(delta = 5)
 
             if finetune_config['LLRD_flag']:
                 optimizer = roberta_base_AdamW_LLRD(model, finetune_config['lr_rate'], finetune_config['weight_decay'])
@@ -365,6 +474,9 @@ def main(finetune_config):
         train_data.iloc[:, 1] = scaler.fit_transform(train_data.iloc[:, 1].values.reshape(-1, 1))
         test_data.iloc[:, 1] = scaler.transform(test_data.iloc[:, 1].values.reshape(-1, 1))
 
+        train_data.iloc[:, 2] = scaler.fit_transform(train_data.iloc[:, 2].values.reshape(-1, 1))
+        test_data.iloc[:, 2] = scaler.transform(test_data.iloc[:, 2].values.reshape(-1, 1))
+
         train_dataset = Downstream_Dataset(train_data, tokenizer, finetune_config['blocksize'])
         test_dataset = Downstream_Dataset(test_data, tokenizer, finetune_config['blocksize'])
         train_dataloader = DataLoader(train_dataset, finetune_config['batch_size'], shuffle=True, num_workers=finetune_config["num_workers"])
@@ -378,7 +490,8 @@ def main(finetune_config):
         """Train the model"""
         model = DownstreamRegression(drop_rate=finetune_config['drop_rate']).to(device)
         model = model.double()
-        loss_fn = nn.MSELoss()
+        # loss_fn = nn.MSELoss()
+        loss_fn = nn.HuberLoss(delta = 5)
 
         if finetune_config['LLRD_flag']:
             optimizer = roberta_base_AdamW_LLRD(model, finetune_config['lr_rate'], finetune_config['weight_decay'])
@@ -438,7 +551,7 @@ if __name__ == "__main__":
     if finetune_config['model_indicator'] == 'pretrain':
         print("Use the pretrained model")
         PretrainedModel = RobertaModel.from_pretrained(finetune_config['model_path'])
-        tokenizer = PolymerSmilesTokenizer.from_pretrained("/project/rcc/hyadav/ChemBERTa-77M-MLM", max_len=finetune_config['blocksize'])
+        tokenizer = PolymerSmilesTokenizer.from_pretrained("/project/rcc/hyadav/roberta-base", max_len=finetune_config['blocksize'])
         PretrainedModel.config.hidden_dropout_prob = finetune_config['hidden_dropout_prob']
         PretrainedModel.config.attention_probs_dropout_prob = finetune_config['attention_probs_dropout_prob']
     else:
@@ -453,7 +566,7 @@ if __name__ == "__main__":
             attention_probs_dropout_prob=0.1
         )
         PretrainedModel = RobertaModel(config=config)
-        tokenizer = RobertaTokenizer.from_pretrained("/project/rcc/hyadav/ChemBERTa-77M-MLM", max_len=finetune_config['blocksize'])
+        tokenizer = RobertaTokenizer.from_pretrained("/project/rcc/hyadav/roberta-base", max_len=finetune_config['blocksize'])
     max_token_len = finetune_config['blocksize']
 
     """Run the main function"""

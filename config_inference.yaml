@@ -6,18 +6,18 @@ aug_special_flag: False                            # whether to augment copolyme
 model_indicator: 'pretrain'                        # whether to use pretrained model
 aug_indicator:                                     # number of augmentation per SMILES. If no limitation, assign the indicator with None (leave it blank).
 
-vocab_sup_file: 'data/vocab/vocab_sup_PE_I_rxnmapper.csv'           # supplementary vocab file path
-train_file: './data/ood_exact_paper_seq_all_solvs.csv' 
-test_file: './data/ood_exact_paper_seq_all_solvs.csv'                     # test file path if cross-validation is not used
+vocab_sup_file: 'data/vocab/vocab_sup_PE_I.csv'           # supplementary vocab file path
+train_file: './data/ood_exact_paper_seq_all_solvs_scaled_temp_sep_norm.csv' 
+test_file: './data/ood_exact_paper_seq_all_solvs_scaled_temp_sep_norm.csv'                     # test file path if cross-validation is not used
 model_path: 'ckpt/pretrain.pt'                      # pretrain model path
-best_model_path: 'ckpt/random_train_exact_paper_seq_vocab_sup_PE_I_rxnmapper_best_model.pt'          # best model save path
+best_model_path: 'ckpt/random_train_temp_concat_scaled_norm_linear_huber_5_mean_pooling_concat_fusion_best_model.pt'          # best model save path
 
 k: 5                                                # k-fold cross-validation
 blocksize: 411                                      # max length of sequences after tokenization
 batch_size: 16                                      # batch size
 num_epochs: 1                                    # total number of epochs
 warmup_ratio: 0.05                                  # warmup ratio
-drop_rate: 0.1                                      # dropout
+drop_rate: 0.1                                  # dropout
 lr_rate: 0.00005                                    # initial lr for LLRD and pretrained model lr otherwise
 lr_rate_reg: 0.0001                                 # regressor lr if LLRD is not used
 weight_decay: 0.01

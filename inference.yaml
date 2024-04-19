@@ -1,0 +1,15 @@
+datasets:
+  - name: random
+    path: 'data/random_test_exact_all_scaled_temp_sep.csv'
+
+  - name: freqI
+    path: 'data/freqI_test_all_scaled_temp_sep.csv'
+
+  - name: freqII
+    path: 'data/freqII_test_all_scaled_temp_sep.csv'
+
+  - name: OOD
+    path: 'data/ood_exact_paper_seq_all_solvs_scaled_temp_sep.csv'
+
+model:
+  path: 'ckpt/random_train_scaled_temp_concat_linear_huber_5_multihead_8_best_model.pt'

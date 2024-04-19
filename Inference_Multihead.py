@@ -110,80 +110,75 @@ def roberta_base_AdamW_LLRD(model, lr, weight_decay):
 
 """Model"""
 
+class GlobalAveragePooling1D(nn.Module):
+    def __init__(self):
+        super(GlobalAveragePooling1D, self).__init__()
+
+    def forward(self, x):
+        return torch.mean(x, dim=1)
+
 class DownstreamRegression(nn.Module):
     def __init__(self, drop_rate=0.1):
         super(DownstreamRegression, self).__init__()
         self.PretrainedModel = deepcopy(PretrainedModel)
         self.PretrainedModel.resize_token_embeddings(len(tokenizer))
-        
-        self.attention_dim = 200
-        self.constant_dim = 1
-        self.embedding_dim = self.PretrainedModel.config.hidden_size
+        self.pooler = GlobalAveragePooling1D()
 
-        #Attention 
-        # self.fc_embed = nn.Linear(self.embedding_dim, self.attention_dim)
-        # self.fc_const = nn.Linear(self.constant_dim, self.attention_dim)
-        # self.fc_out = nn.Linear(self.attention_dim, self.embedding_dim + self.constant_dim)
+        self.dropout = nn.Dropout(drop_rate)
 
-        #Fusion        
-        # self.fusion = torch.nn.Linear(self.PretrainedModel.config.hidden_size + self.constant_dim, self.PretrainedModel.config.hidden_size + self.constant_dim)
-        # self.relu = torch.nn.ReLU()
-        # self.dropout = torch.nn.Dropout(drop_rate)
-
-        #Fusion 2
+        #Multihead Attention
+        self.num_heads = 8
         self.hidden_dim = 256
-        self.linear_text = nn.Linear(self.PretrainedModel.config.hidden_size, self.hidden_dim)
-        self.linear_numeric = nn.Linear(self.constant_dim, self.hidden_dim)
 
-        self.output_layer = nn.Linear(self.hidden_dim, self.PretrainedModel.config.hidden_size + self.constant_dim) 
+        self.text_input_dim = self.PretrainedModel.config.hidden_size
+        self.numeric_input_dim = 64
+
+        self.numeric_input_dim_original = 1
+
+        self.text_attention = nn.MultiheadAttention(embed_dim=self.text_input_dim, num_heads=self.num_heads)
+        self.numeric_attention = nn.MultiheadAttention(embed_dim=self.numeric_input_dim, num_heads=self.num_heads)
+
+        #Linear layer to change temp from dim 1 to dim 64
+        self.linear_numeric_dim_change = nn.Linear(self.numeric_input_dim_original, self.numeric_input_dim)
+
+        # Linear layers for combining the outputs of text and numeric attention
+        self.linear_text = nn.Linear(self.text_input_dim, self.hidden_dim)
+        self.linear_numeric = nn.Linear(self.numeric_input_dim, self.hidden_dim)
+        self.linear_combine = nn.Linear(self.hidden_dim * 2, self.hidden_dim)
         
         self.Regressor = nn.Sequential(
             nn.Dropout(drop_rate),
-            nn.Linear(self.PretrainedModel.config.hidden_size + self.constant_dim, self.PretrainedModel.config.hidden_size + self.constant_dim),
-            nn.SiLU(),
-            nn.Linear(self.PretrainedModel.config.hidden_size + self.constant_dim, 1)
+            nn.Linear(self.hidden_dim, 1),
         )
 
     def forward(self, input_ids, attention_mask, temp):
         outputs = self.PretrainedModel(input_ids=input_ids, attention_mask=attention_mask)
-        logits = outputs.last_hidden_state[:, 0, :]
-        temp = temp.reshape(-1, 1).float()
 
-        ## Attention Code
-        # embedding = logits.double() # 16 by 768
-        # constant = temp.double() # 16 by 1
+        logits = outputs.last_hidden_state.permute(1,0,2)
 
-        # embed_attention = F.softmax(torch.tanh(self.fc_embed(embedding)), dim=1) # 16 by 200
-        # const_attention = F.softmax(torch.tanh(self.fc_const(constant)), dim=1) # 16 by 200
-        
-        # # Weighted sum of embeddings and constant values
-        # embedding= embedding[:, :self.attention_dim]
-        # embed_weighted = embedding * embed_attention # 16 by 768 mul 16 by 200
-        # const_weighted = constant * const_attention # 16 by 1 mul 16 by 200
+        temp = temp.view(1, temp.shape[0], -1)
 
-        # combined = embed_weighted + const_weighted
-        # fused = self.fc_out(combined)
-
-        ## Non-attention Code
-        # concated_data = torch.cat((logits, temp), dim=1)
-        # fused = self.dropout(self.relu(self.fusion(concated_data)))
-
-        ##Fusion 2
         text_input = logits
-        numeric_input = temp
-        # Process text input
-        text_output = F.relu(self.linear_text(text_input))
-        
-        # Process numeric input
-        numeric_output = F.relu(self.linear_numeric(numeric_input))
-        
-        # Compute mean fusion
-        fusion_output = (text_output + numeric_output) / 2
-        fused = self.output_layer(fusion_output)
+        numeric_input = self.linear_numeric_dim_change(temp.float())
 
-        #Regression 
+        ## Multihead Attention Code
+        # Apply attention mechanism to text input
+        text_output, _ = self.text_attention(text_input, text_input, text_input)
+        text_output = self.linear_text(text_output)
+
+        # Apply attention mechanism to numeric input
+        numeric_output, _ = self.numeric_attention(numeric_input, numeric_input, numeric_input)
+        numeric_output = self.linear_numeric(numeric_output)
+
+        # Concatenate and combine the outputs of text and numeric attention after making sequence lengths the same
+        text_output = text_output[0, : , :] # 411 by 16 by 256
+        numeric_output = numeric_output.squeeze(dim=0) # 1 by 16 by 256
+        combined_output = torch.cat((text_output, numeric_output), dim=-1) #16 by 256
+        fused = self.dropout(self.linear_combine(combined_output))
+
         output = self.Regressor(fused)
         return output
+
 
 """Train"""
 
@@ -238,6 +233,8 @@ def test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, s
         print("test r^2 = ", r2_test)
         print("test MAE =", mae_error_test)
 
+
+
     # Inference Plot
 
     fig = plt.figure()
@@ -261,7 +258,7 @@ def test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, s
     writer.add_scalar("Loss/test", test_loss, epoch)
     writer.add_scalar("r^2/test", r2_test, epoch)
 
-    # pdb.set_trace()
+    
 
     return test_loss, r2_test
 
@@ -344,7 +341,8 @@ def main(finetune_config):
             # """Train the model"""
             # model = DownstreamRegression(drop_rate=finetune_config['drop_rate']).to(device)
             # model = model.double()
-            loss_fn = nn.MSELoss()
+            # loss_fn = nn.MSELoss()
+            loss_fn = nn.HuberLoss(delta = 5)
 
             """Load the model"""
             model = DownstreamRegression(drop_rate=finetune_config['drop_rate']).to(device)
@@ -431,7 +429,8 @@ def main(finetune_config):
         model.load_state_dict(model_dict['model'])
         optimizer = model_dict['optimizer']
         scheduler = model_dict['scheduler']
-        loss_fn = nn.MSELoss()
+        # loss_fn = nn.MSELoss()
+        loss_fn = nn.HuberLoss(delta = 5)
 
         # if finetune_config['LLRD_flag']:
         #     optimizer = roberta_base_AdamW_LLRD(model, finetune_config['lr_rate'], finetune_config['weight_decay'])

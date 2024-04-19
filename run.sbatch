@@ -1,22 +1,22 @@
 #!/bin/bash
 #Here is a comment
-#SBATCH --time=12:00:00
+#SBATCH --time=03:00:00
+#SBATCH --nodelist=midway3-0294
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:1
-#SBATCH --job-name=exp_1_rxnmapper_common_log
+#SBATCH --job-name=random_fusion
 #SBATCH --account=rcc-staff
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
-#SBATCH --output=./sbatch_files/exp_1_random_train_exact_paper_seq_common_log_vocab_sup_PE_I_rxnmapper-%j.out
-#SBATCH --error=./sbatch_files/exp_1_random_train_exact_paper_seq_common_log_vocab_sup_PE_I_rxnmapper-%j.err
+#SBATCH --output=./sbatch_files/random/random_train_temp_concat_scaled_linear_huber_5_mean_pooling_mean_fusion_lr00005_tol15-%j.out
+#SBATCH --error=./sbatch_files/random/random_train_temp_concat_scaled_linear_huber_5_mean_pooling_mean_fusion_lr00005_tol15-%j.err
 #SBATCH --mail-user=hyadav@uchicago.edu
 #SBATCH --mail-type=END
-#SBATCH --mem-per-gpu=32000
+#SBATCH --mem-per-gpu=64000
 
 module load python/anaconda-2022.05
 
 source activate TransPolymer
 
-python3 Downstream.py
-
+python3 Downstream_huber.py

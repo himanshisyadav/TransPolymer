@@ -109,13 +109,20 @@ def roberta_base_AdamW_LLRD(model, lr, weight_decay):
     return AdamW(opt_parameters, lr=lr)
 
 """Model"""
+class GlobalAveragePooling1D(nn.Module):
+    def __init__(self):
+        super(GlobalAveragePooling1D, self).__init__()
+
+    def forward(self, x):
+        return torch.mean(x, dim=1)
 
 class DownstreamRegression(nn.Module):
     def __init__(self, drop_rate=0.1):
         super(DownstreamRegression, self).__init__()
         self.PretrainedModel = deepcopy(PretrainedModel)
         self.PretrainedModel.resize_token_embeddings(len(tokenizer))
-        
+        self.pooler = GlobalAveragePooling1D()
+
         self.attention_dim = 200
         self.constant_dim = 1
         self.embedding_dim = self.PretrainedModel.config.hidden_size
@@ -138,15 +145,33 @@ class DownstreamRegression(nn.Module):
         self.output_layer = nn.Linear(self.hidden_dim, self.PretrainedModel.config.hidden_size + self.constant_dim) 
         
         self.Regressor = nn.Sequential(
+        #     nn.Dropout(drop_rate),
+        #     nn.Linear(self.PretrainedModel.config.hidden_size + self.constant_dim, self.PretrainedModel.config.hidden_size + self.constant_dim),
+        #     nn.SiLU(),
+        #     nn.Linear(self.PretrainedModel.config.hidden_size + self.constant_dim, 1)
+        # )
             nn.Dropout(drop_rate),
-            nn.Linear(self.PretrainedModel.config.hidden_size + self.constant_dim, self.PretrainedModel.config.hidden_size + self.constant_dim),
-            nn.SiLU(),
-            nn.Linear(self.PretrainedModel.config.hidden_size + self.constant_dim, 1)
+            nn.Linear(self.PretrainedModel.config.hidden_size + self.constant_dim, 1),
         )
+        #     nn.Dropout(drop_rate),
+        #     nn.Linear(self.PretrainedModel.config.hidden_size + self.constant_dim, 128),
+        #     nn.Dropout(drop_rate),
+        #     nn.Linear(128, 64),
+        #     nn.Dropout(drop_rate),
+        #     nn.Linear(64, 1)
+        # )
 
     def forward(self, input_ids, attention_mask, temp):
         outputs = self.PretrainedModel(input_ids=input_ids, attention_mask=attention_mask)
-        logits = outputs.last_hidden_state[:, 0, :]
+        # Using <s> token
+        # logits = outputs.last_hidden_state[:, 0, :]
+        
+        # Global Average Pooling
+        last_hidden_state = outputs.last_hidden_state[:,:,:]
+        pooled_output = self.pooler(last_hidden_state)
+        logits = pooled_output
+
+        # Getting Temperature Values 
         temp = temp.reshape(-1, 1).float()
 
         ## Attention Code
@@ -169,17 +194,33 @@ class DownstreamRegression(nn.Module):
         # fused = self.dropout(self.relu(self.fusion(concated_data)))
 
         ##Fusion 2
+        # text_input = logits.double()
+        # numeric_input = temp.double()
+        # # Process text input
+        # text_output = F.relu(self.linear_text(text_input))
+        
+        # # Process numeric input
+        # numeric_output = F.relu(self.linear_numeric(numeric_input))
+        
+        # # Compute mean fusion
+        # fusion_output = (text_output + numeric_output) / 2
+        # fused = self.output_layer(fusion_output)
+
+        # Fusion 3: Simple Linear Fusion
         text_input = logits
         numeric_input = temp
         # Process text input
-        text_output = F.relu(self.linear_text(text_input))
+        text_output = self.linear_text(text_input)
         
         # Process numeric input
-        numeric_output = F.relu(self.linear_numeric(numeric_input))
+        numeric_output = self.linear_numeric(numeric_input)
         
         # Compute mean fusion
-        fusion_output = (text_output + numeric_output) / 2
-        fused = self.output_layer(fusion_output)
+        # fusion_output = (text_output + numeric_output) / 2
+        # fused = self.output_layer(fusion_output)
+
+        #Max Fusion
+        fused = self.output_layer(torch.maximum(text_output,numeric_output))
 
         #Regression 
         output = self.Regressor(fused)
@@ -344,7 +385,8 @@ def main(finetune_config):
             # """Train the model"""
             # model = DownstreamRegression(drop_rate=finetune_config['drop_rate']).to(device)
             # model = model.double()
-            loss_fn = nn.MSELoss()
+            # loss_fn = nn.MSELoss()
+            loss_fn = nn.HuberLoss(delta = 5)
 
             """Load the model"""
             model = DownstreamRegression(drop_rate=finetune_config['drop_rate']).to(device)
@@ -431,7 +473,8 @@ def main(finetune_config):
         model.load_state_dict(model_dict['model'])
         optimizer = model_dict['optimizer']
         scheduler = model_dict['scheduler']
-        loss_fn = nn.MSELoss()
+        # loss_fn = nn.MSELoss()
+        loss_fn = nn.HuberLoss(delta = 5)
 
         # if finetune_config['LLRD_flag']:
         #     optimizer = roberta_base_AdamW_LLRD(model, finetune_config['lr_rate'], finetune_config['weight_decay'])
