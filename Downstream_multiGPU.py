@@ -39,6 +39,8 @@ writer = SummaryWriter()
 
 from copy import deepcopy
 
+import torch.distributed as dist
+
 np.random.seed(seed=1)
 
 """Layer-wise learning rate decay"""
@@ -126,10 +128,9 @@ class DownstreamRegression(nn.Module):
         self.Regressor = nn.Sequential(
             nn.Dropout(drop_rate),
             nn.Linear(self.PretrainedModel.config.hidden_size, 128),
-            nn.Dropout(drop_rate),
-            nn.Linear(128, 64),
-            nn.Dropout(drop_rate),
-            nn.Linear(64, 1)
+            # nn.ReLU(),
+            nn.Linear(128, 128),
+            nn.Linear(128, 1)
         )
 
     def forward(self, input_ids, attention_mask):

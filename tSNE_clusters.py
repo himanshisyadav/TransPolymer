@@ -64,7 +64,7 @@ def main(tsne_config):
             attention_probs_dropout_prob=0.1,
         )
 
-    pretrain_data = emb_convert(tsne_config['pretrain_path'], tokenizer, config)
+    # pretrain_data = emb_convert(tsne_config['pretrain_path'], tokenizer, config)
     # PE_I_data = emb_convert(tsne_config['PE_I_path'], tokenizer, config)
     # PE_II_data = emb_convert(tsne_config['PE_II_path'], tokenizer, config)
     # Egc_data = emb_convert(tsne_config['Egc_path'], tokenizer, config)
@@ -76,9 +76,12 @@ def main(tsne_config):
     # Nc_data = emb_convert(tsne_config['Nc_path'], tokenizer, config)
     # OPV_data = emb_convert(tsne_config['OPV_path'], tokenizer, config)
     # Liq_data = emb_convert(tsne_config['Liq_path'], tokenizer, config)
-    random_data = emb_convert(tsne_config['random_path'], tokenizer, config)
-    freqI_data = emb_convert(tsne_config['freqI_path'], tokenizer, config)
-    freqII_data = emb_convert(tsne_config['freqII_path'], tokenizer, config)
+    random_data_train = emb_convert(tsne_config['random_path_train'], tokenizer, config)
+    random_data_test = emb_convert(tsne_config['random_path_test'], tokenizer, config)
+    freqI_data_train = emb_convert(tsne_config['freqI_path_train'], tokenizer, config)
+    freqI_data_test = emb_convert(tsne_config['freqI_path_test'], tokenizer, config)
+    freqII_data_train = emb_convert(tsne_config['freqII_path_train'], tokenizer, config)
+    freqII_data_test = emb_convert(tsne_config['freqII_path_test'], tokenizer, config)
     OOD_data = emb_convert(tsne_config['OOD_path'], tokenizer, config)
 
 
@@ -89,7 +92,8 @@ def main(tsne_config):
         n_jobs=tsne_config['n_jobs'],
         verbose=tsne_config['verbose'],
     )
-    pretrain_tSNE = tSNE.fit(pretrain_data)
+    random_train_tSNE = tSNE.fit(random_data_train)
+    # freqII_train_tSNE =tSNE.fit(freqII_data_train)
     print("finish fitting")
     # PE_I_tSNE = pretrain_tSNE.transform(PE_I_data)
     # PE_II_tSNE = pretrain_tSNE.transform(PE_II_data)
@@ -101,16 +105,19 @@ def main(tsne_config):
     # EPS_tSNE = pretrain_tSNE.transform(EPS_data)
     # Nc_tSNE = pretrain_tSNE.transform(Nc_data)
     # OPV_tSNE = pretrain_tSNE.transform(OPV_data)
-    random_tSNE = pretrain_tSNE.transform(random_data)
-    freqI_tSNE = pretrain_tSNE.transform(freqI_data)
-    freqII_tSNE = pretrain_tSNE.transform(freqII_data)
-    OOD_tSNE = pretrain_tSNE.transform(OOD_data)
+    random_test_tSNE = random_train_tSNE.transform(random_data_test)
+    freqI_train_tSNE = random_train_tSNE.transform(freqI_data_train)
+    freqI_test_tSNE = random_train_tSNE.transform(freqI_data_test)
+    freqII_train_tSNE = random_train_tSNE.transform(freqII_data_train)
+    freqII_test_tSNE = random_train_tSNE.transform(freqII_data_test)
+    # freqII_tSNE = pretrain_tSNE.transform(freqII_data)
+    OOD_tSNE = random_train_tSNE.transform(OOD_data)
 
     print("finish t-SNE")
 
     fig, ax = plt.subplots(figsize=(15, 15))
-    ax.scatter(pretrain_tSNE[:, 0], pretrain_tSNE[:, 1], s=50, edgecolors='None', linewidths=0.4, c='lightgrey',
-               label=tsne_config["pretrain_label"])
+    # ax.scatter(pretrain_tSNE[:, 0], pretrain_tSNE[:, 1], s=50, edgecolors='None', linewidths=0.4, c='lightgrey',
+    #            label=tsne_config["pretrain_label"])
     # ax.scatter(PE_I_tSNE[:, 0], PE_I_tSNE[:, 1], s=50, edgecolors='None', linewidths=0.4, c='maroon', label=tsne_config["PE-I_label"])
     # ax.scatter(PE_II_tSNE[:, 0], PE_II_tSNE[:, 1], s=50, edgecolors='None', linewidths=0.4, c='coral', label=tsne_config["PE-II_label"])
     # ax.scatter(Egc_tSNE[:, 0], Egc_tSNE[:, 1], s=50, edgecolors='None', linewidths=0.4, c='darkorange', label=tsne_config["Egc_label"])
@@ -121,10 +128,14 @@ def main(tsne_config):
     # ax.scatter(EPS_tSNE[:, 0], EPS_tSNE[:, 1], s=50, edgecolors='None', linewidths=0.4, c='blue', label=tsne_config["EPS_label"])
     # ax.scatter(Nc_tSNE[:, 0], Nc_tSNE[:, 1], s=50, edgecolors='None', linewidths=0.4, c='violet', label=tsne_config["Nc_label"])
     # ax.scatter(OPV_tSNE[:, 0], OPV_tSNE[:, 1], s=50, edgecolors='None', linewidths=0.4, c='deeppink', label=tsne_config["OPV_label"])
-    ax.scatter(random_tSNE[:, 0], random_tSNE[:, 1], s=50, edgecolors='None', linewidths=0.4, c='crimson', label=tsne_config["Random_label"])
-    ax.scatter(freqI_tSNE[:, 0], freqI_tSNE[:, 1], s=50, edgecolors='None', linewidths=0.4, c='blue', label=tsne_config["ClusterI_label"])
-    ax.scatter(freqII_tSNE[:, 0], freqII_tSNE[:, 1], s=50, edgecolors='None', linewidths=0.4, c='violet', label=tsne_config["ClusterII_label"])
-    ax.scatter(OOD_tSNE[:, 0], OOD_tSNE[:, 1], s=50, edgecolors='None', linewidths=0.4, c='lawngreen', label=tsne_config["OOD_label"]) 
+    ax.scatter(random_train_tSNE[:, 0], random_train_tSNE[:, 1], s=50, facecolors= 'None', edgecolors='green', linewidths=0.4, label=tsne_config["Random_label_train"])
+    ax.scatter(random_test_tSNE[:, 0], random_test_tSNE[:, 1], s=50, facecolors= 'None', edgecolors='lawngreen', linewidths=0.4, label=tsne_config["Random_label_test"])
+    ax.scatter(freqI_train_tSNE[:, 0], freqI_train_tSNE[:, 1], s=50, facecolors= 'None', edgecolors='purple', linewidths=0.4, label=tsne_config["ClusterI_label_train"])
+    ax.scatter(freqI_test_tSNE[:, 0], freqI_test_tSNE[:, 1], s=50, facecolors= 'None', edgecolors='blue', linewidths=0.4, label=tsne_config["ClusterI_label_test"])
+    ax.scatter(freqII_train_tSNE[:, 0], freqII_train_tSNE[:, 1], s=50, facecolors= 'None', edgecolors='orange', linewidths=0.4, label=tsne_config["ClusterII_label_train"])
+    ax.scatter(freqII_test_tSNE[:, 0], freqII_test_tSNE[:, 1], s=50, facecolors= 'None', edgecolors='red', linewidths=0.4, label=tsne_config["ClusterII_label_test"])
+    # ax.scatter(freqII_tSNE[:, 0], freqII_tSNE[:, 1], s=50, edgecolors='None', linewidths=0.4, c='violet', label=tsne_config["ClusterII_label"])
+    ax.scatter(OOD_tSNE[:, 0], OOD_tSNE[:, 1], s=50, edgecolors='None', linewidths=0.4, c='gold', label=tsne_config["OOD_label"]) 
     ax.set_xticks([])
     ax.set_yticks([])
 

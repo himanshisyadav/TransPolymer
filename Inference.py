@@ -124,9 +124,11 @@ class DownstreamRegression(nn.Module):
         
         self.Regressor = nn.Sequential(
             nn.Dropout(drop_rate),
-            nn.Linear(self.PretrainedModel.config.hidden_size, self.PretrainedModel.config.hidden_size),
-            nn.SiLU(),
-            nn.Linear(self.PretrainedModel.config.hidden_size, 1)
+            nn.Linear(self.PretrainedModel.config.hidden_size, 128),
+            nn.Dropout(drop_rate),
+            nn.Linear(128, 64),
+            nn.Dropout(drop_rate),
+            nn.Linear(64, 1)
         )
 
     def forward(self, input_ids, attention_mask):
@@ -183,26 +185,37 @@ def test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, s
             test_pred = torch.cat([test_pred.to(device), outputs.to(device)])
             test_true = torch.cat([test_true.to(device), prop.to(device)])
 
-        # pdb.set_trace()
-
         test_loss = test_loss / len(test_pred.flatten())
         r2_test = r2score(test_pred.flatten().to("cpu"), test_true.flatten().to("cpu")).item()
         mae_error_test = mae(test_true.flatten().to("cpu"), test_pred.flatten().to("cpu")) 
-        # pdb.set_trace()
         print("test RMSE = ", np.sqrt(test_loss))
         print("test r^2 = ", r2_test)
         print("test MAE =", mae_error_test)
         
+    # df = pd.read_csv("./data/study_data/dataset_5.csv")
+    # y = df['zeros_count']
+
+    # squared_diff = (test_pred.flatten().to("cpu") - test_true.flatten().to("cpu"))**2
+    # rmse_per_point = torch.sqrt(squared_diff)
+    # x = rmse_per_point 
+
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111)
+    # ax.plot(x, y, 'o', color = 'green', markersize = '1')n
+    # filename = ("./data/study_data/freq_II_RMSE_vs_counts.png")
+    # plt.savefig(filename)
+
+    # pdb.set_trace()
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.plot(test_true,test_pred, 'o', color = 'green', markersize = '1')
+    ax.plot(test_true.flatten().to("cpu"),test_pred.flatten().to("cpu"), 'o', color = 'green', markersize = '1')
     xl, xr = ax.get_xlim()
     yt, yb = ax.get_ylim()
     left = xl + 0.5
     top = yt + 0.5
-    m, b = np.polyfit(test_true.flatten(), test_pred.flatten(), 1)
-    ax.plot(test_true, m*test_true+b, color='red')
+    m, b = np.polyfit(test_true.flatten().to("cpu"), test_pred.flatten().to("cpu"), 1)
+    ax.plot(test_true.flatten().to("cpu"), m*(test_true.flatten().to("cpu"))+b, color='red')
     ax.text(left,top, 'RMSE=' + str(round(np.sqrt(test_loss),3)) + ' R2=' + str(round(r2_test,3)) , ha='left', va='top')
     file_name = "./plots/inference_plot_rmse_" + str(np.sqrt(test_loss)) + "_r2_" + str(r2_test) + ".png"
     plt.savefig(file_name)

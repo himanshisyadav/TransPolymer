@@ -9,10 +9,14 @@ Xc_path: 'data/Xc.csv'                           # Xc file path
 EPS_path: 'data/EPS.csv'                         # EPS file path
 Nc_path: 'data/Nc.csv'                           # Nc file path
 OPV_path: 'data/OPV.csv'                         # OPV file path
-random_path: 'data/random_train_exact_paper_seq_common_log.csv'  #Random Electrolyte path
-freqI_path: 'data/freqI_train_exact_paper_seq_common_log.csv' 
-freqII_path: 'data/freqII_train_exact_paper_seq_common_log.csv'
+random_path_train: 'data/random_train_exact_paper_seq_common_log.csv'  #Random Electrolyte path
+random_path_test: 'data/random_test_exact_paper_seq_common_log.csv'
+freqI_path_train: 'data/freqI_train_exact_paper_seq_common_log.csv' 
+freqI_path_test: 'data/freqI_test_exact_paper_seq_common_log.csv'
+freqII_path_train: 'data/freqII_train_exact_paper_seq_common_log.csv'
+freqII_path_test: 'data/freqII_test_exact_paper_seq_common_log.csv'
 OOD_path: 'data/ood_exact_paper_seq_all_solvs_common_log.csv'
+
 
 pretrain_label: 'Pretrain (1M)'
 PE-I_label: 'PE-I'
@@ -25,12 +29,15 @@ Xc_label: 'Xc'
 EPS_label: 'EPS'                         
 Nc_label: 'Nc'                         
 OPV_label: 'OPV'
-Random_label: 'Random'
-ClusterI_label: 'Cluster I'
-ClusterII_label: 'Cluster II'
+Random_label_train: 'Random Train'
+Random_label_test: 'Random Test'
+ClusterI_label_train: 'Cluster I Train'
+ClusterI_label_test: 'Cluster I Test'
+ClusterII_label_train: 'Cluster II Train'
+ClusterII_label_test: 'Cluster II Test'
 OOD_label: 'OOD'                       
 
-save_path: 'figs/tSNE_new_datasets.png'                       # save path of tSNE visualization
+save_path: 'figs/tSNE_ours.png'                       # save path of tSNE visualization
 blocksize: 512                                   # max length of sequences after tokenization
 batch_size: 8                                   # batch size
 

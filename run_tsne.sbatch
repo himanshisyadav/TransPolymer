@@ -1,6 +1,6 @@
 #!/bin/bash
 #Here is a comment
-#SBATCH --time=1-12:00:00
+#SBATCH --time=00:05:00
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:1
 #SBATCH --job-name=tsne
@@ -18,4 +18,4 @@ module load python/anaconda-2022.05
 
 source activate TransPolymer
 
-python3 tSNE.py
+python3 tSNE_clusters.py

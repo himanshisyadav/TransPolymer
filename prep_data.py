@@ -183,7 +183,8 @@ def exact_paper_seq_common_log_temp_first_token_salt_next(num_file, smiles_file,
     df_input['solv_4'] = df_input[['solv_4_sm', 'solv_ratio_4', 'mol_wt_solv_4']].apply("$".join, axis=1)
     df_input['salt'] = df_input[['salt_sm', 'conc_salt']].apply("$".join, axis=1)
     df_input_final = pd.DataFrame()
-
+    print(df_input.max(axis=0))
+    print(df_input.min(axis=0))
     df_input_final['input'] = df_input[['temperature', 'salt' ,'solv_1', 'solv_2', 'solv_3', 'solv_4']].apply("|".join, axis=1)
     df_input_final['conductivity_log'] = df_input['conductivity_log']
     df_input_final.to_csv(output_file, index = False)
@@ -238,8 +239,8 @@ def exact_paper_seq_ood_using_all_solvs(num_file, smiles_file, output_file):
     # df_input = unique_rows
 
     #Using only unique solvents and salts
-    unique_rows = df_input.drop_duplicates(subset=['solv_comb_sm','salt_sm'])
-    df_input = unique_rows
+    # unique_rows = df_input.drop_duplicates(subset=['solv_comb_sm','salt_sm'])
+    # df_input = unique_rows
 
     df_input['solv_1_sm'] = df_input['solv_comb_sm']
     df_input['solv_2_sm'] = "NAN_SMILES"
@@ -253,7 +254,7 @@ def exact_paper_seq_ood_using_all_solvs(num_file, smiles_file, output_file):
     df_input['solv_4'] = df_input[['solv_4_sm', 'solv_ratio_4', 'mol_wt_solv_4']].apply("$".join, axis=1)
     df_input['salt'] = df_input[['salt_sm', 'conc_salt']].apply("$".join, axis=1)
     df_input_final = pd.DataFrame()
-    df_input_final['input'] = df_input[['temperature', 'salt', 'solv_1', 'solv_2', 'solv_3', 'solv_4' ]].apply("|".join, axis=1)
+    df_input_final['input'] = df_input[['solv_1', 'solv_2', 'solv_3', 'solv_4', 'salt', 'temperature']].apply("|".join, axis=1)
 
     df_input_final['conductivity_log'] = df_input['conductivity_log']
     df_input_final.to_csv(output_file, index = False)
@@ -292,12 +293,12 @@ def main():
     # all_dollar()
     # exact_paper_seq_common_log_data_aug("./data/random_train_multi_add.csv", "./data/random_train_multi_comp.csv", "./data/random_train_augmented.csv")
     # exact_paper_seq_common_log_temp_first_token_salt_next("./data/random_train_multi_add.csv", "./data/random_train_multi_comp.csv","./data/random_train_temp_first_token_salt_next.csv")
-    exact_paper_seq_common_log_temp_first_token_salt_next("./data/freqI_train_multi_comp_add.csv", "./data/freqI_train_multi_comp.csv","./data/freqI_train_temp_first_token_salt_next_all_scaled.csv")
+    # exact_paper_seq_common_log_temp_first_token_salt_next("./data/freqII_train_multi_comp_add.csv", "./data/freqII_train_multi_comp.csv","./data/freqII_train_temp_first_token_salt_next_all_scaled.csv")
     # exact_paper_seq("./data/freqII_train_multi_comp_add.csv", "./data/freqII_train_multi_comp.csv", "./data/freqII_train_exact_paper_seq_common_log.csv")
     # exact_paper_seq_decimal_2_common_log("./data/freqII_test_multi_comp_add.csv", "./data/freqII_test_multi_comp.csv", "./data/freqII_test_exact_paper_seq_decimal_2_common_log.csv")
     # exact_paper_seq_ood_using_all_solvs_drop_negative("./data/ood_add.csv", "./data/ood_comp.csv", "./data/ood_exact_paper_seq_all_solvs_temp_first_token_salt_next_no_negative_conductivity_common_log.csv")
     # exact_paper_seq_ood_using_all_solvs("./data/ood_add.csv", "./data/ood_comp.csv", "./data/ood_exact_paper_seq_all_solvs_temp_first_token_salt_next_unique_smiles.csv")
+    exact_paper_seq_ood_using_all_solvs("./data/electrolyte-data/electrolyte-data/ood_add.csv", "./data/electrolyte-data/electrolyte-data/ood_comp.csv", "./data/ood_exact_paper_seq_all_solvs_common_log_new.csv")
     
-
 if __name__ == "__main__":
-    main()
+    main()  
