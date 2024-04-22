@@ -9,8 +9,8 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
-#SBATCH --output=./sbatch_files/random/random_train_temp_concat_scaled_linear_huber_5_mean_pooling_mean_fusion_lr00005_tol15-%j.out
-#SBATCH --error=./sbatch_files/random/random_train_temp_concat_scaled_linear_huber_5_mean_pooling_mean_fusion_lr00005_tol15-%j.err
+#SBATCH --output=./sbatch_files/random/random_no_mol_scaled_linear_huber_5_mean_pooling_mean_fusion_lr00001_tol10-%j.out
+#SBATCH --error=./sbatch_files/random/random_no_mol_scaled_linear_huber_5_mean_pooling_mean_fusion_lr00001_tol10-%j.err
 #SBATCH --mail-user=hyadav@uchicago.edu
 #SBATCH --mail-type=END
 #SBATCH --mem-per-gpu=64000
