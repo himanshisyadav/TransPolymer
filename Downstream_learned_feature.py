@@ -120,50 +120,16 @@ class DownstreamRegression(nn.Module):
         self.PretrainedModel = deepcopy(PretrainedModel)
         self.PretrainedModel.resize_token_embeddings(len(tokenizer))
         self.pooler = GlobalAveragePooling1D()
-
-        self.attention_dim = 200
-        self.constant_dim = 1
-        self.embedding_dim = self.PretrainedModel.config.hidden_size
-
-        #Attention 
-        # self.fc_embed = nn.Linear(self.embedding_dim, self.attention_dim)
-        # self.fc_const = nn.Linear(self.constant_dim, self.attention_dim)
-        # self.fc_out = nn.Linear(self.attention_dim, self.embedding_dim + self.constant_dim)
-
-        #Fusion        
-        # self.fusion = torch.nn.Linear(self.PretrainedModel.config.hidden_size + self.constant_dim, self.PretrainedModel.config.hidden_size + self.constant_dim)
-        # self.relu = torch.nn.ReLU()
-        # self.dropout = torch.nn.Dropout(drop_rate)
-
-        #Fusion 2
-        # self.hidden_dim = 256
-        self.hidden_dim = 16
-        self.linear_text = nn.Linear(self.PretrainedModel.config.hidden_size, self.hidden_dim)
-        self.linear_numeric = nn.Linear(self.constant_dim, self.hidden_dim)
-
-        self.output_layer = nn.Linear(self.hidden_dim, self.PretrainedModel.config.hidden_size + self.constant_dim) 
         
+        self.numeric_featurizer = nn.Linear(1, self.PretrainedModel.config.hidden_size)
+
         self.Regressor = nn.Sequential(
-        #     nn.Dropout(drop_rate),
-        #     nn.Linear(self.PretrainedModel.config.hidden_size + self.constant_dim, self.PretrainedModel.config.hidden_size + self.constant_dim),
-        #     nn.SiLU(),
-        #     nn.Linear(self.PretrainedModel.config.hidden_size + self.constant_dim, 1)
-        # )
             nn.Dropout(drop_rate),
-            nn.Linear(self.PretrainedModel.config.hidden_size + self.constant_dim, 1),
+            nn.Linear(self.PretrainedModel.config.hidden_size, 1),
         )
-        #     nn.Dropout(drop_rate),
-        #     nn.Linear(self.PretrainedModel.config.hidden_size + self.constant_dim, 128),
-        #     nn.Dropout(drop_rate),
-        #     nn.Linear(128, 64),
-        #     nn.Dropout(drop_rate),
-        #     nn.Linear(64, 1)
-        # )
 
     def forward(self, input_ids, attention_mask, temp):
         outputs = self.PretrainedModel(input_ids=input_ids, attention_mask=attention_mask)
-        # Using <s> token
-        # logits = outputs.last_hidden_state[:, 0, :]
         
         # Global Average Pooling
         last_hidden_state = outputs.last_hidden_state[:,:,:]
@@ -173,53 +139,20 @@ class DownstreamRegression(nn.Module):
         # Getting Temperature Values 
         temp = temp.reshape(-1, 1).float()
 
-        ## Attention Code
-        # embedding = logits.double() # 16 by 768
-        # constant = temp.double() # 16 by 1
-
-        # embed_attention = F.softmax(torch.tanh(self.fc_embed(embedding)), dim=1) # 16 by 200
-        # const_attention = F.softmax(torch.tanh(self.fc_const(constant)), dim=1) # 16 by 200
-        
-        # # Weighted sum of embeddings and constant values
-        # embedding= embedding[:, :self.attention_dim]
-        # embed_weighted = embedding * embed_attention # 16 by 768 mul 16 by 200
-        # const_weighted = constant * const_attention # 16 by 1 mul 16 by 200
-
-        # combined = embed_weighted + const_weighted
-        # fused = self.fc_out(combined)
-
-        ## Non-attention Code
-        # concated_data = torch.cat((logits, temp), dim=1)
-        # fused = self.dropout(self.relu(self.fusion(concated_data)))
-
-        ##Fusion 2
-        # text_input = logits.double()
-        # numeric_input = temp.double()
-        # # Process text input
-        # text_output = F.relu(self.linear_text(text_input))
-        
-        # # Process numeric input
-        # numeric_output = F.relu(self.linear_numeric(numeric_input))
-        
-        # # Compute mean fusion
-        # fusion_output = (text_output + numeric_output) / 2
-        # fused = self.output_layer(fusion_output)
-
         # Fusion 3: Simple Linear Fusion
         text_input = logits.double()
         numeric_input = temp.double()
-        # Process text input
-        text_output = self.linear_text(text_input)
+
+        # Process text input, convert to a feature vector of size pretrain hidden dim
+        text_output = text_input
         
         # Process numeric input
-        numeric_output = self.linear_numeric(numeric_input)
+        numeric_output = self.numeric_featurizer(numeric_input)
+        # pdb.set_trace()
         
-        # Compute mean fusion
-        fusion_output = (text_output + numeric_output) / 2
-        fused = self.output_layer(fusion_output)
-
-        #Max Fusion
-        # fused = self.output_layer(torch.maximum(text_output,numeric_output))
+        # Compute mean fusion (FIX THIS, it shouldn't be /2 if the vectors are not of size 1, or do concat)
+        # fused = (text_output + numeric_output) / 2
+        fused = torch.mean(torch.stack([text_output, numeric_output]), dim=0)
 
         #Regression 
         output = self.Regressor(fused)
@@ -371,8 +304,8 @@ def main(finetune_config):
                 test_data = DataAug.combine_columns(test_data)
             
             scaler = StandardScaler()
-            train_data.iloc[:, 1] = scaler.fit_transform(train_data.iloc[:, 1].values.reshape(-1, 1))
-            test_data.iloc[:, 1] = scaler.transform(test_data.iloc[:, 1].values.reshape(-1, 1))
+            train_data.iloc[:, 2] = scaler.fit_transform(train_data.iloc[:, 2].values.reshape(-1, 1))
+            test_data.iloc[:, 2] = scaler.transform(test_data.iloc[:, 2].values.reshape(-1, 1))
 
             train_dataset = Downstream_Dataset(train_data, tokenizer, finetune_config['blocksize'])
             test_dataset = Downstream_Dataset(test_data, tokenizer, finetune_config['blocksize'])
@@ -471,8 +404,8 @@ def main(finetune_config):
             test_data = DataAug.combine_columns(test_data)
 
         scaler = StandardScaler()
-        train_data.iloc[:, 1] = scaler.fit_transform(train_data.iloc[:, 1].values.reshape(-1, 1))
-        test_data.iloc[:, 1] = scaler.transform(test_data.iloc[:, 1].values.reshape(-1, 1))
+        # train_data.iloc[:, 1] = scaler.fit_transform(train_data.iloc[:, 1].values.reshape(-1, 1))
+        # test_data.iloc[:, 1] = scaler.transform(test_data.iloc[:, 1].values.reshape(-1, 1))
 
         train_data.iloc[:, 2] = scaler.fit_transform(train_data.iloc[:, 2].values.reshape(-1, 1))
         test_data.iloc[:, 2] = scaler.transform(test_data.iloc[:, 2].values.reshape(-1, 1))
