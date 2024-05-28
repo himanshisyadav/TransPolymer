@@ -1,14 +1,15 @@
-task: 'pretrain'                                      # the task to visualize the attention scores
-smiles: '1.0$0.0$0.0$0.0$102.0316941$0.0$0.0$0.0$0.0024655$25.0$CC1COC(=O)O1$CC[N+](CC)(CC)CC.C(F)(F)(F)S(=O)(=O)[O-]'                                       # the SMILES used for visualization when task=='pretrain'
+task: 'finetune'                                      # the task to visualize the attention scores
+# smiles: '1.0$0.0$0.0$0.0$102.0316941$0.0$0.0$0.0$0.0024655$25.0$CC1COC(=O)O1$CC[N+](CC)(CC)CC.C(F)(F)(F)S(=O)(=O)[O-]'  # the SMILES used for visualization when task=='pretrain'
+smiles : 'O=C1OCCO1$-0.8134055506108595|COC(=O)OC$1.0058034437585717|NAN_SMILES$-0.2905047650080638|NAN_SMILES$-0.08878944101871596|[Li+].F[P-](F)(F)(F)(F)F$0.2686087630370412,0.14504282248098646'
 layer: 0                                              # the hidden layer for visualization when task=='pretrain'
 index: 8                                           # the index of the sequence used for visualization when task=='finetune'
 add_vocab_flag: False                                 # whether to add supplementary vocab
 
-file_path: 'data/train_liq.csv'                           # train file path
-vocab_sup_file: 'data/vocab/vocab_sup_PE_I.csv'            # supplementary vocab file path
-model_path: 'ckpt/old_best_model.pt'                # finetuned model path
-pretrain_path: 'ckpt/pretrain.pt'                     # pretrained model path
-save_path: 'figs/attention_vis_pretrain_testing.png'                   # figure save path
+file_path: './data/freqI_train_exact_paper_seq_common_log_temp_sep_scaled_no_mol_new.csv'                           # train file path
+vocab_sup_file: './data/vocab/vocab_sup_PE_I.csv'            # supplementary vocab file path
+model_path: './ckpt/random_no_mol_scaled_new_linear_huber_5_temp_mul_768_best_model.pt'                # finetuned model path
+pretrain_path: './ckpt/pretrain.pt'                     # pretrained model path
+save_path: './figs/attention_vis_freqI_fusion.png'                   # figure save path
 blocksize: 97                                          # max length of sequences after tokenization
 
 figsize_x: 30                                         # the size of figure in x

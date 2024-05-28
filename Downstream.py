@@ -1,12 +1,10 @@
+import pdb
 import pandas as pd
 import numpy as np
 import sys
 import yaml
 
 from tqdm.auto import tqdm
-
-import joblib
-from joblib import dump, load
 
 import torch
 import torch.nn as nn
@@ -20,12 +18,15 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, multilabel_confusion_matrix
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import KFold
+
+import joblib
+from joblib import dump, load
+
 from rdkit import Chem
 
 from pylab import rcParams
 import matplotlib.pyplot as plt
 from matplotlib import rc
-from matplotlib.offsetbox import AnchoredText
 
 from packaging import version
 
@@ -40,11 +41,8 @@ writer = SummaryWriter()
 
 from copy import deepcopy
 
-import pdb
-import seaborn as sns
-from sklearn.metrics import mean_absolute_error as mae 
-
 np.random.seed(seed=1)
+import torchinfo
 
 """Layer-wise learning rate decay"""
 
@@ -133,7 +131,11 @@ class DownstreamRegression(nn.Module):
             nn.Dropout(drop_rate),
             nn.Linear(self.PretrainedModel.config.hidden_size, 1),
         )
-
+        #     nn.Dropout(drop_rate),
+        #     # nn.Linear(self.PretrainedModel.config.hidden_size, self.PretrainedModel.config.hidden_size),
+        #     # nn.Tanh(),
+        #     nn.Linear(self.PretrainedModel.config.hidden_size, 1)
+        # )
 
     def forward(self, input_ids, attention_mask, temp):
         outputs = self.PretrainedModel(input_ids=input_ids, attention_mask=attention_mask)
@@ -147,14 +149,15 @@ class DownstreamRegression(nn.Module):
         temp = temp.reshape(-1, 1).float()
 
         # Fusion 3: Simple Linear Fusion
-        text_input = logits
-        numeric_input = temp
+        text_input = logits.double()
+        numeric_input = temp.double()
 
         # Process text input, convert to a feature vector of size pretrain hidden dim
         text_output = text_input
         
         # Process numeric input
         numeric_output = self.numeric_featurizer(numeric_input)
+        # pdb.set_trace()
         
         # Compute mean fusion (FIX THIS, it shouldn't be /2 if the vectors are not of size 1, or do concat)
         # fused = (text_output + numeric_output) / 2
@@ -165,6 +168,7 @@ class DownstreamRegression(nn.Module):
         #Regression 
         output = self.Regressor(fused)
         return output
+
 """Train"""
 
 def train(model, optimizer, scheduler, loss_fn, train_dataloader, device):
@@ -178,8 +182,10 @@ def train(model, optimizer, scheduler, loss_fn, train_dataloader, device):
         attention_mask = batch["attention_mask"].to(device)
         temp = batch["temp"].to(device).float()
         prop = batch["prop"].to(device).float()
+        # torchinfo.summary(model, verbose = 1)
         optimizer.zero_grad()
         outputs = model(input_ids, attention_mask, temp).float()
+        # pdb.set_trace()
         loss = loss_fn(outputs.squeeze(), prop.squeeze())
         loss.backward()
         optimizer.step()
@@ -187,23 +193,42 @@ def train(model, optimizer, scheduler, loss_fn, train_dataloader, device):
 
     return None
 
-def test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, scheduler, epoch):
+def test(model, loss_fn, train_dataloader, test_dataloader, device, scaler, optimizer, scheduler, epoch):
 
     r2score = R2Score()
+    train_loss = 0
     test_loss = 0
     # count = 0
     model.eval()
     with torch.no_grad():
-        test_pred, test_true = torch.tensor([]), torch.tensor([])
+        train_pred, train_true, test_pred, test_true = torch.tensor([]), torch.tensor([]), torch.tensor(
+            []), torch.tensor([])
+
+        for step, batch in enumerate(train_dataloader):
+            input_ids = batch["input_ids"].to(device)
+            attention_mask = batch["attention_mask"].to(device)
+            prop = batch["prop"].to(device).float()
+            temp = batch["temp"].to(device).float()
+            outputs = model(input_ids, attention_mask, temp).float()
+            outputs = torch.from_numpy(scaler.inverse_transform(outputs.cpu().reshape(-1, 1)))
+            prop = torch.from_numpy(scaler.inverse_transform(prop.cpu().reshape(-1, 1)))
+            loss = loss_fn(outputs.squeeze(), prop.squeeze())
+            train_loss += loss.item() * len(prop)
+            # print("Train Loss: ", train_loss)
+            train_pred = torch.cat([train_pred.to(device), outputs.to(device)])
+            train_true = torch.cat([train_true.to(device), prop.to(device)])
+
+        train_loss = train_loss / len(train_pred.flatten())
+        r2_train = r2score(train_pred.flatten().to("cpu"), train_true.flatten().to("cpu")).item()
+        print("train RMSE = ", np.sqrt(train_loss))
+        print("train r^2 = ", r2_train)
 
         for step, batch in enumerate(test_dataloader):
             input_ids = batch["input_ids"].to(device)
             attention_mask = batch["attention_mask"].to(device)
-            temp = batch["temp"].to(device).float()
             prop = batch["prop"].to(device).float()
+            temp = batch["temp"].to(device).float()
             outputs = model(input_ids, attention_mask, temp).float()
-            scaler = load('std_scaler_random_conductivity.bin')
-            # scaler = load('std_scaler_cond_ood_conductivity_log.bin')
             outputs = torch.from_numpy(scaler.inverse_transform(outputs.cpu().reshape(-1, 1)))
             prop = torch.from_numpy(scaler.inverse_transform(prop.cpu().reshape(-1, 1)))
             loss = loss_fn(outputs.squeeze(), prop.squeeze())
@@ -213,70 +238,21 @@ def test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, s
 
         test_loss = test_loss / len(test_pred.flatten())
         r2_test = r2score(test_pred.flatten().to("cpu"), test_true.flatten().to("cpu")).item()
-        mae_error_test = mae(test_true.flatten().to("cpu"), test_pred.flatten().to("cpu")) 
         print("test RMSE = ", np.sqrt(test_loss))
         print("test r^2 = ", r2_test)
-        print("test MAE =", mae_error_test)
 
-    # # Inference Plot
-
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111)
-    # ax.plot(test_true.flatten().to("cpu"),test_pred.flatten().to("cpu"), 'o', color = 'green', markersize = '1')
-    # xl, xr = ax.get_xlim()
-    # yt, yb = ax.get_ylim()
-    # left = xl + 0.5
-    # top = yt + 0.5
-
-    # # Add diagonal line
-    # min_val = min(torch.min(test_true.flatten().to("cpu")), torch.min(test_pred.flatten().to("cpu")))
-    # max_val = max(torch.max(test_true.flatten().to("cpu")), torch.max(test_pred.flatten().to("cpu")))
-    # ax.plot([min_val, max_val], [min_val, max_val], color='red', linestyle='--', label='Diagonal Line')
-
-    # ax.text(left,top, 'RMSE=' + str(round(np.sqrt(test_loss),3)) + ' R2=' + str(round(r2_test,3)) + ' MAE=' + str(round(mae_error_test,3)), ha='left', va='top')
-    # plt.grid(True)
-    # file_name = "./plots/inference_plot_rmse_" + str(np.sqrt(test_loss)) + "_r2_" + str(r2_test) + "_mae_" + str(mae_error_test) + ".png"
-    # plt.savefig(file_name)
-
-    #Plots like Ritesh's plots
-
-    y_true = test_true.flatten().to("cpu")
-    y_pred = test_pred.flatten().to("cpu")
-
-    axmin = min(min(y_true), min(y_pred)) - 0.1*(max(y_true)-min(y_true))
-    axmax = max(max(y_true), max(y_pred)) + 0.1*(max(y_true)-min(y_true))
-    
-    mae_calc = mae_error_test
-    rmse = np.sqrt(test_loss)
-    r2 = r2_test
-    
-    plt.plot([axmin, axmax], [axmin, axmax], '--k')
-    
-    plt.errorbar(y_true, y_pred, linewidth=0, marker='o', markeredgecolor='w', alpha=1, elinewidth=1, color='blue', markersize=8)
-    
-    plt.xlim((axmin, axmax))
-    plt.ylim((axmin, axmax))
-    
-    ax = plt.gca()
-    ax.set_aspect('equal')
-    
-    at = AnchoredText(
-    f"MAE = {mae_calc:.2f}\nRMSE = {rmse:.2f}\nR$^2$ = {r2:.2f}", prop=dict(size=10), frameon=True, loc='upper left')
-    at.patch.set_boxstyle("round,pad=0.,rounding_size=0.2")
-    ax.add_artist(at)
-    
-    plt.xlabel('log$_{10}{}\sigma_{Li^+}^{GT}$')
-    plt.ylabel('log$_{10}{}\sigma_{Li^+}^{ML}$')
-    figname = "./plots/inference_plot_rmse_" + str(np.sqrt(test_loss)) + "_r2_" + str(r2_test) + "_mae_" + str(mae_error_test) + ".png"
-    if figname != None:
-        plt.savefig(figname, dpi=300)
-
+    writer.add_scalar("Loss/train", train_loss, epoch)
+    writer.add_scalar("r^2/train", r2_train, epoch)
     writer.add_scalar("Loss/test", test_loss, epoch)
     writer.add_scalar("r^2/test", r2_test, epoch)
 
-    # pdb.set_trace()
+    state = {'model': model.state_dict(), 'optimizer': optimizer.state_dict(), 'scheduler': scheduler.state_dict(),
+             'epoch': epoch}
+    torch.save(state, finetune_config['save_path'])
 
-    return test_loss, r2_test
+    
+
+    return train_loss, test_loss, r2_train, r2_test
 
     """
 
@@ -337,12 +313,10 @@ def main(finetune_config):
                     test_data = DataAug.combine_smiles(test_data)
                 train_data = DataAug.combine_columns(train_data)
                 test_data = DataAug.combine_columns(test_data)
-
-            # scaler = StandardScaler()
-            # train_data.iloc[:, 1] = scaler.fit_transform(train_data.iloc[:, 1].values.reshape(-1, 1))
-            # test_data.iloc[:, 1] = scaler.transform(test_data.iloc[:, 1].values.reshape(-1, 1))
-            # train_data.iloc[:, 2] = scaler.fit_transform(train_data.iloc[:, 2].values.reshape(-1, 1))
-            # test_data.iloc[:, 2] = scaler.transform(test_data.iloc[:, 2].values.reshape(-1, 1))
+            
+            scaler = StandardScaler()
+            train_data.iloc[:, 2] = scaler.fit_transform(train_data.iloc[:, 2].values.reshape(-1, 1))
+            test_data.iloc[:, 2] = scaler.transform(test_data.iloc[:, 2].values.reshape(-1, 1))
 
             train_dataset = Downstream_Dataset(train_data, tokenizer, finetune_config['blocksize'])
             test_dataset = Downstream_Dataset(test_data, tokenizer, finetune_config['blocksize'])
@@ -354,19 +328,11 @@ def main(finetune_config):
             training_steps = steps_per_epoch * finetune_config['num_epochs']
             warmup_steps = int(training_steps * finetune_config['warmup_ratio'])
 
-            # """Train the model"""
-            # model = DownstreamRegression(drop_rate=finetune_config['drop_rate']).to(device)
-            # model = model.double()
+            """Train the model"""
+            model = DownstreamRegression(drop_rate=finetune_config['drop_rate']).to(device)
+            model = model.double()
             # loss_fn = nn.MSELoss()
             loss_fn = nn.HuberLoss(delta = 5)
-
-            """Load the model"""
-            model = DownstreamRegression(drop_rate=finetune_config['drop_rate']).to(device)
-            model_dict = torch.load(finetune_config['best_model_path'], map_location='cpu')
-            model.load_state_dict(model_dict['model'])
-            optimizer = model_dict['optimizer']
-            scheduler = model_dict['scheduler']
-
 
             if finetune_config['LLRD_flag']:
                 optimizer = roberta_base_AdamW_LLRD(model, finetune_config['lr_rate'], finetune_config['weight_decay'])
@@ -383,26 +349,51 @@ def main(finetune_config):
             scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_steps,
                                                         num_training_steps=training_steps)
             torch.cuda.empty_cache()
-            test_loss_best, best_test_r2 = 0.0, 0.0, 0.0, 0.0  # Keep track of the best test r^2 in one fold. If cross-validation is not used, that will be the same as best_r2.
+            train_loss_best, test_loss_best, best_train_r2, best_test_r2 = 0.0, 0.0, 0.0, 0.0  # Keep track of the best test r^2 in one fold. If cross-validation is not used, that will be the same as best_r2.
             count = 0     # Keep track of how many successive non-improvement epochs
             for epoch in range(finetune_config['num_epochs']):
                 print("epoch: %s/%s" % (epoch+1, finetune_config['num_epochs']))
-                # train(model, optimizer, scheduler, loss_fn, train_dataloader, device)
-                test_loss, r2_test = test(model, loss_fn, train_dataloader,
-                                                                                   test_dataloader, device,
+                train(model, optimizer, scheduler, loss_fn, train_dataloader, device)
+                train_loss, test_loss, r2_train, r2_test = test(model, loss_fn, train_dataloader,
+                                                                                   test_dataloader, device, scaler,
                                                                                    optimizer, scheduler, epoch)
+                if r2_test > best_test_r2:
+                    best_train_r2 = r2_train
+                    best_test_r2 = r2_test
+                    train_loss_best = train_loss
+                    test_loss_best = test_loss
+                    count = 0
+                else:
+                    count += 1
 
+                if r2_test > best_r2:
+                    best_r2 = r2_test
+                    state = {'model': model.state_dict(), 'optimizer': optimizer.state_dict(), 'scheduler': scheduler.state_dict(), 'epoch': epoch, 'fold:': fold}
+                    torch.save(state, finetune_config['best_model_path'])         # save the best model
+
+                if count >= finetune_config['tolerance']:
+                    print("Early stop")
+                    if best_test_r2 == 0:
+                        print("Poor performance with negative r^2")
+                    break
+
+            train_loss_avg.append(np.sqrt(train_loss_best))
             test_loss_avg.append(np.sqrt(test_loss_best))
+            train_r2_avg.append(best_train_r2)
             test_r2_avg.append(best_test_r2)
             writer.flush()
 
         """Average of metrics over all folds"""
+        train_rmse = np.mean(np.array(train_loss_avg))
         test_rmse = np.mean(np.array(test_loss_avg))
+        train_r2 = np.mean(np.array(train_r2_avg))
         test_r2 = np.mean(np.array(test_r2_avg))
         std_test_rmse = np.std(np.array(test_loss_avg))
         std_test_r2 = np.std(np.array(test_r2_avg))
 
+        print("Train RMSE =", train_rmse)
         print("Test RMSE =", test_rmse)
+        print("Train R^2 =", train_r2)
         print("Test R^2 =", test_r2)
         print("Standard Deviation of Test RMSE =", std_test_rmse)
         print("Standard Deviation of Test R^2 =", std_test_r2)
@@ -423,10 +414,15 @@ def main(finetune_config):
             train_data = DataAug.combine_columns(train_data)
             test_data = DataAug.combine_columns(test_data)
 
-        #Only for Random
+        # Random Conductivity Only
         # scaler = StandardScaler()
+        # # train_data.iloc[:, 1] = scaler.fit_transform(train_data.iloc[:, 1].values.reshape(-1, 1))
+        # # test_data.iloc[:, 1] = scaler.transform(test_data.iloc[:, 1].values.reshape(-1, 1))
+
         # train_data.iloc[:, 2] = scaler.fit_transform(train_data.iloc[:, 2].values.reshape(-1, 1))
         # test_data.iloc[:, 2] = scaler.transform(test_data.iloc[:, 2].values.reshape(-1, 1))
+
+        # dump(scaler, 'std_scaler_random_conductivity.bin', compress=True)
 
         train_dataset = Downstream_Dataset(train_data, tokenizer, finetune_config['blocksize'])
         test_dataset = Downstream_Dataset(test_data, tokenizer, finetune_config['blocksize'])
@@ -438,44 +434,61 @@ def main(finetune_config):
         training_steps = steps_per_epoch * finetune_config['num_epochs']
         warmup_steps = int(training_steps * finetune_config['warmup_ratio'])
 
-        """Load the model"""
+        """Train the model"""
         model = DownstreamRegression(drop_rate=finetune_config['drop_rate']).to(device)
-        model_dict = torch.load(finetune_config['best_model_path'], map_location='cpu')
-        model.load_state_dict(model_dict['model'])
-        optimizer = model_dict['optimizer']
-        scheduler = model_dict['scheduler']
+        model = model.double()
         # loss_fn = nn.MSELoss()
         loss_fn = nn.HuberLoss(delta = 5)
 
-        # if finetune_config['LLRD_flag']:
-        #     optimizer = roberta_base_AdamW_LLRD(model, finetune_config['lr_rate'], finetune_config['weight_decay'])
-        # else:
-        #     pdb.set_trace()
-        #     optimizer = AdamW(
-        #         [
-        #             {"params": model.PretrainedModel.parameters(), "lr": finetune_config['lr_rate'],
-        #              "weight_decay": 0.0},
-        #             {"params": model.Regressor.parameters(), "lr": finetune_config['lr_rate_reg'],
-        #              "weight_decay": finetune_config['weight_decay']},
-        #         ]
-        #     )
+        if finetune_config['LLRD_flag']:
+            optimizer = roberta_base_AdamW_LLRD(model, finetune_config['lr_rate'], finetune_config['weight_decay'])
+        else:
+            optimizer = AdamW(
+                [
+                    {"params": model.PretrainedModel.parameters(), "lr": finetune_config['lr_rate'],
+                     "weight_decay": 0.0},
+                    {"params": model.Regressor.parameters(), "lr": finetune_config['lr_rate_reg'],
+                     "weight_decay": finetune_config['weight_decay']},
+                ]
+            )
 
-        # scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_steps,
-                                                    # num_training_steps=training_steps)
+        scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_steps,
+                                                    num_training_steps=training_steps)
         torch.cuda.empty_cache()
-        test_loss_best, best_test_r2 = 0.0, 0.0  # Keep track of the best test r^2 in one fold. If cross-validation is not used, that will be the same as best_r2.
+        train_loss_best, test_loss_best, best_train_r2, best_test_r2 = 0.0, 0.0, 0.0, 0.0  # Keep track of the best test r^2 in one fold. If cross-validation is not used, that will be the same as best_r2.
         count = 0     # Keep track of how many successive non-improvement epochs
         for epoch in range(finetune_config['num_epochs']):
             print("epoch: %s/%s" % (epoch+1,finetune_config['num_epochs']))
-            # train(model, optimizer, scheduler, loss_fn, train_dataloader, device)
-            test_loss, r2_test = test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, scheduler, epoch)
+            train(model, optimizer, scheduler, loss_fn, train_dataloader, device)
+            train_loss, test_loss, r2_train, r2_test = test(model, loss_fn, train_dataloader,
+                                                                                   test_dataloader, device, scaler,
+                                                                                   optimizer, scheduler, epoch)
+            if r2_test > best_test_r2:
+                best_train_r2 = r2_train
+                best_test_r2 = r2_test
+                train_loss_best = train_loss
+                test_loss_best = test_loss
+                count = 0
+            else:
+                count += 1
+
+            if r2_test > best_r2:
+                best_r2 = r2_test
+                state = {'model': model.state_dict(), 'optimizer': optimizer.state_dict(), 'scheduler': scheduler.state_dict(), 'epoch': epoch}
+                torch.save(state, finetune_config['best_model_path'])         # save the best model
+
+            if count >= finetune_config['tolerance']:
+                print("Early stop")
+                if best_test_r2 == 0:
+                    print("Poor performance with negative r^2")
+                break
 
         writer.flush()
 
 
 if __name__ == "__main__":
 
-    finetune_config = yaml.load(open("config_inference.yaml", "r"), Loader=yaml.FullLoader)
+    finetune_config = yaml.load(open("config_finetune.yaml", "r"), Loader=yaml.FullLoader)
     print(finetune_config)
 
     """Device"""
@@ -500,7 +513,7 @@ if __name__ == "__main__":
             attention_probs_dropout_prob=0.1
         )
         PretrainedModel = RobertaModel(config=config)
-        tokenizer = RobertaTokenizer.from_pretrained("/project/rcc/hyadav/ChemBERTa-77M-MLM", max_len=finetune_config['blocksize'])
+        tokenizer = RobertaTokenizer.from_pretrained("/project/rcc/hyadav/roberta-base", max_len=finetune_config['blocksize'])
     max_token_len = finetune_config['blocksize']
 
     """Run the main function"""

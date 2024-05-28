@@ -37,23 +37,57 @@ import pdb
 
 from colorama import init, Fore, Style
 
+class GlobalAveragePooling1D(nn.Module):
+    def __init__(self):
+        super(GlobalAveragePooling1D, self).__init__()
+
+    def forward(self, x):
+        return torch.mean(x, dim=1)
+
 class DownstreamRegression(nn.Module):
     def __init__(self, drop_rate=0.1):
         super(DownstreamRegression, self).__init__()
         self.PretrainedModel = deepcopy(PretrainedModel)
         self.PretrainedModel.resize_token_embeddings(len(tokenizer))
 
+        self.pooler = GlobalAveragePooling1D()
+
         self.Regressor = nn.Sequential(
             nn.Dropout(drop_rate),
-            nn.Linear(self.PretrainedModel.config.hidden_size, self.PretrainedModel.config.hidden_size),
-            nn.SiLU(),
+            # nn.Linear(self.PretrainedModel.config.hidden_size, self.PretrainedModel.config.hidden_size),
+            # nn.SiLU(),
             nn.Linear(self.PretrainedModel.config.hidden_size, 1)
         )
 
-    def forward(self, input_ids, attention_mask):
+    def forward(self, input_ids, attention_mask, temp):
         outputs = self.PretrainedModel(input_ids=input_ids, attention_mask=attention_mask)
-        logits = outputs.last_hidden_state[:, 0, :]
-        output = self.Regressor(logits)
+        
+        # Global Average Pooling
+        last_hidden_state = outputs.last_hidden_state[:,:,:]
+        pooled_output = self.pooler(last_hidden_state)
+        logits = pooled_output
+
+        # Getting Temperature Values 
+        temp = temp.reshape(-1, 1).float()
+
+        # Fusion 3: Simple Linear Fusion
+        text_input = logits
+        numeric_input = temp
+
+        # Process text input, convert to a feature vector of size pretrain hidden dim
+        text_output = text_input
+        
+        # Process numeric input
+        numeric_output = self.numeric_featurizer(numeric_input)
+        
+        # Compute fusion 
+        # fused = (text_output + numeric_output) / 2
+        # fused = torch.mean(torch.stack([text_output, numeric_output]), dim=0)
+        # fused = torch.cat((text_output, numeric_output), 1)
+        fused = text_output * numeric_output
+
+        #Regression 
+        output = self.Regressor(fused)
         return output
 
 
@@ -80,8 +114,10 @@ def main(attention_config):
         return_tensors='pt',
     )
 
+    pdb.set_trace()
     input_ids = encoding["input_ids"].to(device)
     attention_mask = encoding["attention_mask"].to(device)
+    # temp = encoding["temp"].to(device)
 
     if attention_config['task'] == 'pretrain':
         outputs = PretrainedModel(input_ids=input_ids, attention_mask=attention_mask, output_attentions=True)
@@ -93,7 +129,7 @@ def main(attention_config):
 
         model.eval()
         with torch.no_grad():
-            outputs = model.PretrainedModel(input_ids=input_ids, attention_mask=attention_mask, output_attentions=True)
+            outputs = model.PretrainedModel(input_ids=input_ids, attention_mask=attention_mask, temp=temp, output_attentions=True)
 
     attention = outputs[-1]
 
@@ -101,7 +137,6 @@ def main(attention_config):
     xticklabels = tokenizer.convert_ids_to_tokens(input_ids.squeeze())
 
     if attention_config['task'] == 'pretrain':
-
         for i in range(3):
             for j in range(4):
                 sns.heatmap(attention[attention_config['layer']][0,4*i+j,:,:].cpu().detach().numpy(), ax = axes[i,j], xticklabels=xticklabels, yticklabels=xticklabels)
