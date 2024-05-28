@@ -37,22 +37,31 @@ import pdb
 
 from colorama import init, Fore, Style
 
+class GlobalAveragePooling1D(nn.Module):
+    def __init__(self):
+        super(GlobalAveragePooling1D, self).__init__()
+
+    def forward(self, x):
+        return torch.mean(x, dim=1)
+
 class DownstreamRegression(nn.Module):
     def __init__(self, drop_rate=0.1):
         super(DownstreamRegression, self).__init__()
         self.PretrainedModel = deepcopy(PretrainedModel)
         self.PretrainedModel.resize_token_embeddings(len(tokenizer))
+        self.pooler = GlobalAveragePooling1D()
 
         self.Regressor = nn.Sequential(
             nn.Dropout(drop_rate),
-            nn.Linear(self.PretrainedModel.config.hidden_size, self.PretrainedModel.config.hidden_size),
-            nn.SiLU(),
             nn.Linear(self.PretrainedModel.config.hidden_size, 1)
         )
 
     def forward(self, input_ids, attention_mask):
         outputs = self.PretrainedModel(input_ids=input_ids, attention_mask=attention_mask)
-        logits = outputs.last_hidden_state[:, 0, :]
+        # logits = outputs.last_hidden_state[:, 0, :]
+        last_hidden_state = outputs.last_hidden_state[:,:,:]
+        pooled_output = self.pooler(last_hidden_state)
+        logits = pooled_output
         output = self.Regressor(logits)
         return output
 
@@ -79,6 +88,8 @@ def main(attention_config):
         return_attention_mask=True,
         return_tensors='pt',
     )
+
+    # pdb.set_trace()
 
     input_ids = encoding["input_ids"].to(device)
     attention_mask = encoding["attention_mask"].to(device)

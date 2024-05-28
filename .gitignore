@@ -6,3 +6,4 @@ plots/
 ckpt/
 data/electrolyte-data
 data/
+*.bin

@@ -10,6 +10,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.clip_grad import clip_grad_norm
+import torchinfo
 
 from transformers import AdamW, get_linear_schedule_with_warmup, RobertaModel, RobertaConfig, RobertaTokenizer
 
@@ -124,15 +125,17 @@ class DownstreamRegression(nn.Module):
         
         self.Regressor = nn.Sequential(
             nn.Dropout(drop_rate),
-            nn.Linear(self.PretrainedModel.config.hidden_size, self.PretrainedModel.config.hidden_size),
-            nn.SiLU(),
-            nn.Linear(self.PretrainedModel.config.hidden_size, 1)
+            nn.Linear(self.PretrainedModel.config.hidden_size, 128),
+            nn.Dropout(drop_rate),
+            nn.Linear(128, 64),
+            nn.Dropout(drop_rate),
+            nn.Linear(64, 1)
         )
 
     def forward(self, input_ids, attention_mask):
         outputs = self.PretrainedModel(input_ids=input_ids, attention_mask=attention_mask)
         
-        # logits = outputs.last_hidden_state[:, 1, :]
+        # logits = outputs.last_hidden_state[:, 0, :]
 
         #Trying Global Average Pooling
         last_hidden_state = outputs.last_hidden_state[:,:,:]
@@ -296,8 +299,7 @@ def main(finetune_config):
             """Train the model"""
             model = DownstreamRegression(drop_rate=finetune_config['drop_rate']).to(device)
             model = model.double()
-            # loss_fn = nn.MSELoss()
-            loss_fn = nn.HuberLoss(delta=5)
+            loss_fn = nn.MSELoss()
 
             if finetune_config['LLRD_flag']:
                 optimizer = roberta_base_AdamW_LLRD(model, finetune_config['lr_rate'], finetune_config['weight_decay'])
@@ -396,8 +398,7 @@ def main(finetune_config):
         """Train the model"""
         model = DownstreamRegression(drop_rate=finetune_config['drop_rate']).to(device)
         model = model.double()
-        # loss_fn = nn.MSELoss()
-        loss_fn = nn.HuberLoss(delta=5)
+        loss_fn = nn.MSELoss()
 
         if finetune_config['LLRD_flag']:
             optimizer = roberta_base_AdamW_LLRD(model, finetune_config['lr_rate'], finetune_config['weight_decay'])

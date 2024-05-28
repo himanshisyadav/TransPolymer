@@ -21,8 +21,12 @@ from rdkit import Chem
 from pylab import rcParams
 import matplotlib.pyplot as plt
 from matplotlib import rc
+from matplotlib.offsetbox import AnchoredText
 
 from packaging import version
+
+import joblib
+from joblib import dump, load
 
 import torchmetrics
 from torchmetrics import R2Score
@@ -123,23 +127,18 @@ class DownstreamRegression(nn.Module):
         self.pooler = GlobalAveragePooling1D()
         
         self.Regressor = nn.Sequential(
-            nn.Dropout(drop_rate),
-            nn.Linear(self.PretrainedModel.config.hidden_size, 128),
-            nn.Dropout(drop_rate),
-            nn.Linear(128, 64),
-            nn.Dropout(drop_rate),
-            nn.Linear(64, 1)
+        nn.Dropout(drop_rate),
+        nn.Linear(self.PretrainedModel.config.hidden_size, 1)
         )
 
     def forward(self, input_ids, attention_mask):
         outputs = self.PretrainedModel(input_ids=input_ids, attention_mask=attention_mask)
-        # logits = outputs.last_hidden_state[:, 0, :]
+        # logits = outputs.last_hidden_state[:, 1, :]
 
-        #Trying Global Average Pooling
+        #Global Average Pooling
         last_hidden_state = outputs.last_hidden_state[:,:,:]
         pooled_output = self.pooler(last_hidden_state)
         logits = pooled_output
-
         output = self.Regressor(logits)
         return output
 
@@ -164,7 +163,7 @@ def train(model, optimizer, scheduler, loss_fn, train_dataloader, device):
 
     return None
 
-def test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, scheduler, scaler, epoch):
+def test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, scheduler, epoch):
 
     r2score = R2Score()
     test_loss = 0
@@ -178,6 +177,10 @@ def test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, s
             attention_mask = batch["attention_mask"].to(device)
             prop = batch["prop"].to(device).float()
             outputs = model(input_ids, attention_mask).float()
+            # scaler = load('std_scaler_random_conductivity.bin')
+            # scaler = load('std_scaler_cond_ood_conductivity_log.bin')
+            # scaler = load('std_scaler_cood_ood_ce_train_CE.bin')
+            scaler = load('std_scaler_ce_train_CE.bin')
             outputs = torch.from_numpy(scaler.inverse_transform(outputs.cpu().reshape(-1, 1)))
             prop = torch.from_numpy(scaler.inverse_transform(prop.cpu().reshape(-1, 1)))
             loss = loss_fn(outputs.squeeze(), prop.squeeze())
@@ -191,13 +194,15 @@ def test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, s
         print("test RMSE = ", np.sqrt(test_loss))
         print("test r^2 = ", r2_test)
         print("test MAE =", mae_error_test)
-        
+        # pdb.set_trace()
+
+    # # Zeros Counts Graph    
     # df = pd.read_csv("./data/study_data/dataset_5.csv")
     # y = df['zeros_count']
 
-    # squared_diff = (test_pred.flatten().to("cpu") - test_true.flatten().to("cpu"))**2
-    # rmse_per_point = torch.sqrt(squared_diff)
-    # x = rmse_per_point 
+    squared_diff = (test_pred.flatten().to("cpu") - test_true.flatten().to("cpu"))**2
+    rmse_per_point = torch.sqrt(squared_diff)
+    x = rmse_per_point
 
     # fig = plt.figure()
     # ax = fig.add_subplot(111)
@@ -205,20 +210,84 @@ def test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, s
     # filename = ("./data/study_data/freq_II_RMSE_vs_counts.png")
     # plt.savefig(filename)
 
-    # pdb.set_trace()
+    # Inference Plot
 
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax.plot(test_true.flatten().to("cpu"),test_pred.flatten().to("cpu"), 'o', color = 'green', markersize = '1')
-    xl, xr = ax.get_xlim()
-    yt, yb = ax.get_ylim()
-    left = xl + 0.5
-    top = yt + 0.5
-    m, b = np.polyfit(test_true.flatten().to("cpu"), test_pred.flatten().to("cpu"), 1)
-    ax.plot(test_true.flatten().to("cpu"), m*(test_true.flatten().to("cpu"))+b, color='red')
-    ax.text(left,top, 'RMSE=' + str(round(np.sqrt(test_loss),3)) + ' R2=' + str(round(r2_test,3)) , ha='left', va='top')
-    file_name = "./plots/inference_plot_rmse_" + str(np.sqrt(test_loss)) + "_r2_" + str(r2_test) + ".png"
-    plt.savefig(file_name)
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111)
+    # ax.plot(test_true.flatten().to("cpu"),test_pred.flatten().to("cpu"), 'o', color = 'green', markersize = '1')
+    # xl, xr = ax.get_xlim()
+    # yt, yb = ax.get_ylim()
+    # left = xl + 0.5
+    # top = yt + 0.5
+
+    # # Add diagonal line
+    # min_val = min(torch.min(test_true.flatten().to("cpu")), torch.min(test_pred.flatten().to("cpu")))
+    # max_val = max(torch.max(test_true.flatten().to("cpu")), torch.max(test_pred.flatten().to("cpu")))
+    # ax.plot([min_val, max_val], [min_val, max_val], color='red', linestyle='--', label='Diagonal Line')
+
+    # ax.text(left,top, 'RMSE=' + str(round(np.sqrt(test_loss),3)) + ' R2=' + str(round(r2_test,3)) + ' MAE=' + str(round(mae_error_test,3)), ha='left', va='top')
+    # plt.grid(True)
+    # file_name = "./plots/inference_plot_rmse_" + str(np.sqrt(test_loss)) + "_r2_" + str(r2_test) + "_mae_" + str(mae_error_test) + ".png"
+    # plt.savefig(file_name)
+
+    #Plots like Ritesh's plots
+
+    y_true = test_true.flatten().to("cpu")
+    y_pred = test_pred.flatten().to("cpu")
+
+    axmin = min(min(y_true), min(y_pred)) - 0.1*(max(y_true)-min(y_true))
+    axmax = max(max(y_true), max(y_pred)) + 0.1*(max(y_true)-min(y_true))
+    
+    mae_calc = mae_error_test
+    rmse = np.sqrt(test_loss)
+    r2 = r2_test
+    
+    plt.plot([axmin, axmax], [axmin, axmax], '--k')
+    
+    plt.errorbar(y_true, y_pred, linewidth=0, marker='o', markeredgecolor='w', alpha=1, elinewidth=1, color='blue', markersize=8)
+    
+    plt.xlim((axmin, axmax))
+    plt.ylim((axmin, axmax))
+    
+    ax = plt.gca()
+    ax.set_aspect('equal')
+    
+    at = AnchoredText(
+    f"MAE = {mae_calc:.2f}\nRMSE = {rmse:.2f}\nR$^2$ = {r2:.2f}", prop=dict(size=10), frameon=True, loc='upper left')
+    at.patch.set_boxstyle("round,pad=0.,rounding_size=0.2")
+    ax.add_artist(at)
+    
+    plt.xlabel('log$_{10}{}\sigma_{Li^+}^{GT}$')
+    plt.ylabel('log$_{10}{}\sigma_{Li^+}^{ML}$')
+    figname = "./plots/inference_plot_rmse_" + str(np.sqrt(test_loss)) + "_r2_" + str(r2_test) + "_mae_" + str(mae_error_test) + ".png"
+    if figname != None:
+        plt.savefig(figname, dpi=300)
+
+    # Residuals Histogram Plot
+
+    # # Calculate residuals
+    # residuals = test_true.flatten().to("cpu") - test_pred.flatten().to("cpu")
+
+    # # Plot histogram of residuals
+    # plt.figure(figsize=(8, 6))
+    # plt.hist(residuals, bins=20, color='blue', edgecolor='black', alpha=0.7)
+    # plt.xlabel('Residuals')
+    # plt.ylabel('Frequency')
+    # plt.title('Histogram of Residuals')
+    # plt.grid(True)
+    # file_name = "./plots/histogram_plot_rmse_" + str(np.sqrt(test_loss)) + "_r2_" + str(r2_test) + "_mae_" + str(mae_error_test) + ".png"
+    # plt.savefig(file_name)
+
+    # # Plot histogram of residuals
+    # plt.figure(figsize=(8, 6))
+    # plt.scatter(test_pred.flatten().to("cpu"), residuals, color='blue', alpha=0.5)
+    # plt.axhline(y=0, color='red', linestyle='--')
+    # plt.xlabel('Fitted Values')
+    # plt.ylabel('Residuals')
+    # plt.title('Residuals vs. Fitted Curve')
+    # plt.grid(True)
+    # file_name = "./plots/check_hetero_plot_rmse_" + str(np.sqrt(test_loss)) + "_r2_" + str(r2_test) + "_mae_" + str(mae_error_test) + ".png"
+    # plt.savefig(file_name)
 
     writer.add_scalar("Loss/test", test_loss, epoch)
     writer.add_scalar("r^2/test", r2_test, epoch)
@@ -285,9 +354,9 @@ def main(finetune_config):
                 train_data = DataAug.combine_columns(train_data)
                 test_data = DataAug.combine_columns(test_data)
 
-            scaler = StandardScaler()
-            train_data.iloc[:, 1] = scaler.fit_transform(train_data.iloc[:, 1].values.reshape(-1, 1))
-            test_data.iloc[:, 1] = scaler.transform(test_data.iloc[:, 1].values.reshape(-1, 1))
+            # scaler = StandardScaler()
+            # train_data.iloc[:, 1] = scaler.fit_transform(train_data.iloc[:, 1].values.reshape(-1, 1))
+            # test_data.iloc[:, 1] = scaler.transform(test_data.iloc[:, 1].values.reshape(-1, 1))
 
             train_dataset = Downstream_Dataset(train_data, tokenizer, finetune_config['blocksize'])
             test_dataset = Downstream_Dataset(test_data, tokenizer, finetune_config['blocksize'])
@@ -302,7 +371,8 @@ def main(finetune_config):
             # """Train the model"""
             # model = DownstreamRegression(drop_rate=finetune_config['drop_rate']).to(device)
             # model = model.double()
-            loss_fn = nn.MSELoss()
+            # loss_fn = nn.MSELoss()
+            loss_fn = nn.HuberLoss(delta=2)
 
             """Load the model"""
             model = DownstreamRegression(drop_rate=finetune_config['drop_rate']).to(device)
@@ -333,7 +403,7 @@ def main(finetune_config):
                 print("epoch: %s/%s" % (epoch+1, finetune_config['num_epochs']))
                 # train(model, optimizer, scheduler, loss_fn, train_dataloader, device)
                 test_loss, r2_test = test(model, loss_fn, train_dataloader,
-                                                                                   test_dataloader, device, scaler,
+                                                                                   test_dataloader, device,
                                                                                    optimizer, scheduler, epoch)
 
             test_loss_avg.append(np.sqrt(test_loss_best))
@@ -367,9 +437,10 @@ def main(finetune_config):
             train_data = DataAug.combine_columns(train_data)
             test_data = DataAug.combine_columns(test_data)
 
-        scaler = StandardScaler()
-        train_data.iloc[:, 1] = scaler.fit_transform(train_data.iloc[:, 1].values.reshape(-1, 1))
-        test_data.iloc[:, 1] = scaler.transform(test_data.iloc[:, 1].values.reshape(-1, 1))
+        #Only for random
+        # scaler = StandardScaler()
+        # train_data.iloc[:, 1] = scaler.fit_transform(train_data.iloc[:, 1].values.reshape(-1, 1))
+        # test_data.iloc[:, 1] = scaler.transform(test_data.iloc[:, 1].values.reshape(-1, 1))
 
         train_dataset = Downstream_Dataset(train_data, tokenizer, finetune_config['blocksize'])
         test_dataset = Downstream_Dataset(test_data, tokenizer, finetune_config['blocksize'])
@@ -387,7 +458,8 @@ def main(finetune_config):
         model.load_state_dict(model_dict['model'])
         optimizer = model_dict['optimizer']
         scheduler = model_dict['scheduler']
-        loss_fn = nn.MSELoss()
+        # loss_fn = nn.MSELoss()
+        loss_fn = nn.HuberLoss(delta=2)
 
         # if finetune_config['LLRD_flag']:
         #     optimizer = roberta_base_AdamW_LLRD(model, finetune_config['lr_rate'], finetune_config['weight_decay'])
@@ -410,7 +482,7 @@ def main(finetune_config):
         for epoch in range(finetune_config['num_epochs']):
             print("epoch: %s/%s" % (epoch+1,finetune_config['num_epochs']))
             # train(model, optimizer, scheduler, loss_fn, train_dataloader, device)
-            test_loss, r2_test = test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, scheduler, scaler, epoch)
+            test_loss, r2_test = test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, scheduler, epoch)
 
         writer.flush()
 
