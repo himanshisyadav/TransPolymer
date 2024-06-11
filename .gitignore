@@ -4,6 +4,8 @@ test_plots/
 runs/
 plots/
 ckpt/
-data/electrolyte-data
 data/
+figs/
 *.bin
+*.html
+*.pyc

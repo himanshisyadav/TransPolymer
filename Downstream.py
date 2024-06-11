@@ -127,8 +127,6 @@ class DownstreamRegression(nn.Module):
         
         self.Regressor = nn.Sequential(
             nn.Dropout(drop_rate),
-            # nn.Linear(self.PretrainedModel.config.hidden_size, self.PretrainedModel.config.hidden_size),
-            # nn.SiLU(),
             nn.Linear(self.PretrainedModel.config.hidden_size, 1)
         )
 
@@ -388,7 +386,8 @@ def main(finetune_config):
         # test_data.iloc[:, 1] = scaler.transform(test_data.iloc[:, 1].values.reshape(-1, 1))
 
         # dump(scaler, 'std_scaler_random_conductivity.bin', compress=True)
-        scaler = load('std_scaler_ce_train_CE.bin')
+        # scaler = load('std_scaler_ce_train_CE.bin')
+        scaler = load('std_scaler_strat_conductivity_common_log.bin')
 
         train_dataset = Downstream_Dataset(train_data, tokenizer, finetune_config['blocksize'])
         test_dataset = Downstream_Dataset(test_data, tokenizer, finetune_config['blocksize'])
