@@ -161,4 +161,4 @@ class Interpreter(nn.Module):
         # cbar = fig.colorbar(cax, orientation='horizontal')
         plt.tight_layout()
         plt.show()
-        plt.savefig("./figs/perturb.png")
+        plt.savefig("./figs/perturb_pretrain_06_14_24_6.png")

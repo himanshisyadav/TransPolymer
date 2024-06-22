@@ -180,7 +180,8 @@ def test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, s
             # scaler = load('std_scaler_random_conductivity.bin')
             # scaler = load('std_scaler_cond_ood_conductivity_log.bin')
             # scaler = load('std_scaler_cood_ood_ce_train_CE.bin')
-            scaler = load('std_scaler_ce_train_CE.bin')
+            # scaler = load('std_scaler_ce_train_CE.bin')
+            scaler = load('std_scaler_strat_conductivity_common_log.bin')
             outputs = torch.from_numpy(scaler.inverse_transform(outputs.cpu().reshape(-1, 1)))
             prop = torch.from_numpy(scaler.inverse_transform(prop.cpu().reshape(-1, 1)))
             loss = loss_fn(outputs.squeeze(), prop.squeeze())
@@ -194,7 +195,7 @@ def test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, s
         print("test RMSE = ", np.sqrt(test_loss))
         print("test r^2 = ", r2_test)
         print("test MAE =", mae_error_test)
-        # pdb.set_trace()
+
 
     # # Zeros Counts Graph    
     # df = pd.read_csv("./data/study_data/dataset_5.csv")
@@ -372,7 +373,7 @@ def main(finetune_config):
             # model = DownstreamRegression(drop_rate=finetune_config['drop_rate']).to(device)
             # model = model.double()
             # loss_fn = nn.MSELoss()
-            loss_fn = nn.HuberLoss(delta=2)
+            loss_fn = nn.HuberLoss(delta=5)
 
             """Load the model"""
             model = DownstreamRegression(drop_rate=finetune_config['drop_rate']).to(device)
@@ -459,7 +460,7 @@ def main(finetune_config):
         optimizer = model_dict['optimizer']
         scheduler = model_dict['scheduler']
         # loss_fn = nn.MSELoss()
-        loss_fn = nn.HuberLoss(delta=2)
+        loss_fn = nn.HuberLoss(delta=5)
 
         # if finetune_config['LLRD_flag']:
         #     optimizer = roberta_base_AdamW_LLRD(model, finetune_config['lr_rate'], finetune_config['weight_decay'])
@@ -514,7 +515,7 @@ if __name__ == "__main__":
             attention_probs_dropout_prob=0.1
         )
         PretrainedModel = RobertaModel(config=config)
-        tokenizer = RobertaTokenizer.from_pretrained("/project/rcc/hyadav/ChemBERTa-77M-MLM", max_len=finetune_config['blocksize'])
+        tokenizer = RobertaTokenizer.from_pretrained("/project/rcc/hyadav/roberta-base", max_len=finetune_config['blocksize'])
     max_token_len = finetune_config['blocksize']
 
     """Run the main function"""

@@ -28,4 +28,4 @@ weight_decay: 0.1 #Ionic
 hidden_dropout_prob: 0.1                            # hidden layer dropout
 attention_probs_dropout_prob: 0.1                  # attention dropout
 tolerance: 10                                        # tolerance of no improvement in performance before early stop
-num_workers: 8         
+num_workers: 8          

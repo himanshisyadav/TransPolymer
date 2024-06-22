@@ -7,20 +7,21 @@ model_indicator: 'pretrain'                        # whether to use pretrained m
 aug_indicator:                                     # number of augmentation per SMILES. If no limitation, assign the indicator with None (leave it blank).
 
 vocab_sup_file: 'data/vocab/vocab_sup_PE_I.csv'           # supplementary vocab file path
-train_file: 'data/CE-data/test_CE_exact_all_scaled_nonfusion_no_mol_new.csv'
-test_file: 'data/CE-data/test_CE_exact_all_scaled_nonfusion_no_mol_new.csv'                    # test file path if cross-validation is not used
+train_file:  '/project/rcc/hyadav/TransPolymer_2/data/new-chemprop-data/train_clus1_exact_strat_scaled_nonfusion_no_mol_new.csv'              
+test_file: '/project/rcc/hyadav/TransPolymer_2/data/new-chemprop-data/test_clus1_exact_strat_scaled_nonfusion_no_mol_new.csv'  
 model_path: 'ckpt/pretrain.pt'                      # pretrain model path
-best_model_path: 'ckpt/train_CE_scaled_nonfusion_no_mol_new_huber_2_temp_mul_768_best_model.pt'                 # best model save path
+# best_model_path: 'ckpt/train_CE_scaled_nonfusion_no_mol_new_huber_2_temp_mul_768_best_model.pt'                 # best model save path
+best_model_path: 'ckpt/strat_exact_all_scaled_nonfusion_no_mol_new_huber_5_best_model.pt'
 
-k: 5                                                # k-fold cross-validation
+k: 4                                                # k-fold cross-validation
 blocksize: 411                                      # max length of sequences after tokenization
 batch_size: 16                                      # batch size
 num_epochs: 1                                    # total number of epochs
 warmup_ratio: 0.05                                  # warmup ratio
 drop_rate: 0.1                                      # dropout
 lr_rate: 0.00005                                    # initial lr for LLRD and pretrained model lr otherwise
-lr_rate_reg: 0.000001                                 # regressor lr if LLRD is not used
-weight_decay: 0.01
+lr_rate_reg: 0.00001                                 # regressor lr if LLRD is not used
+weight_decay: 0.1
 hidden_dropout_prob: 0.1                           # hidden layer dropout
 attention_probs_dropout_prob: 0.1                   # attention dropout
 tolerance: 10                                        # tolerance of no improvement in performance before early stop

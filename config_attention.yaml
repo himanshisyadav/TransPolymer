@@ -1,8 +1,9 @@
-task: 'finetune'                                      # the task to visualize the attention scores
+task: 'pretrain'                                      # the task to visualize the attention scores
 # smiles: '1.0$0.0$0.0$0.0$102.0316941$0.0$0.0$0.0$0.0024655$25.0$CC1COC(=O)O1$CC[N+](CC)(CC)CC.C(F)(F)(F)S(=O)(=O)[O-]'                                       # the SMILES used for visualization when task=='pretrain'
 # smiles: 'CCOCCOCCF$0.14526539939082295|O=C1OCCO1$-0.034349440242238675|NAN_SMILES$-0.2905047650080638|NAN_SMILES$-0.08878944101871596|[Li+].F[P-](F)(F)(F)(F)F$0.2686087630370412|-0.19245332275752697'
-smiles: 'CCOCCOCCF$0.14|O=C1OCCO1$-0.03|NAN_SMILES$-0.29|NAN_SMILES$-0.09|[Li+].F[P-](F)(F)(F)(F)F$0.27|-0.19'
-layer: 0                                              # the hidden layer for visualization when task=='pretrain'
+# smiles: 'CCOCCOCCF$0.14|O=C1OCCO1$-0.03|NAN_SMILES$-0.29|NAN_SMILES$-0.09|[Li+].F[P-](F)(F)(F)(F)F$0.27|-0.19'
+smiles: 'CCOCCOCCF'
+layer: 5                                              # the hidden layer for visualization when task=='pretrain'
 index: 8                                           # the index of the sequence used for visualization when task=='finetune'
 add_vocab_flag: True                                 # whether to add supplementary vocab
 
@@ -10,8 +11,8 @@ file_path: './data/random_train_exact_all_scaled_nonfusion_no_mol_new.csv'      
 vocab_sup_file: './data/vocab/vocab_sup_PE_I.csv'            # supplementary vocab file path
 model_path: './ckpt/random_no_mol_scaled_new_linear_huber_5_temp_mul_768_nonfusion_new_best_model.pt'                # finetuned model path
 pretrain_path: './ckpt/pretrain.pt'                     # pretrained model path
-save_path: './figs/attention_finetune_random_perturb.png'                   # figure save path
-blocksize: 197                                         # max length of sequences after tokenization
+save_path: './figs/sa_map_pretrain_random_layer_6.png'                   # figure save path
+blocksize: 9                                         # max length of sequences after tokenization
 
 figsize_x: 30                                         # the size of figure in x
 figsize_y: 18                                         # the size of figure in y

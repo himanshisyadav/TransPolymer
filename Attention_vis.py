@@ -74,6 +74,8 @@ def main(attention_config):
         smiles = data.values[attention_config['index'],0]
         # pdb.set_trace()
 
+    # pdb.set_trace()
+
     if attention_config['add_vocab_flag']:
         vocab_sup = pd.read_csv(attention_config['vocab_sup_file'], header=None).values.flatten().tolist()
         tokenizer.add_tokens(vocab_sup)
@@ -88,8 +90,6 @@ def main(attention_config):
         return_attention_mask=True,
         return_tensors='pt',
     )
-
-    pdb.set_trace()
 
     input_ids = encoding["input_ids"].to(device)
     attention_mask = encoding["attention_mask"].to(device)

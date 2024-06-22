@@ -63,7 +63,8 @@ class DownstreamRegression(nn.Module):
     
 def main(attention_config):
     data = pd.read_csv(attention_config['file_path'])
-    smiles= "CCOCCOCCF$0.14|O=C1OCCO1$-0.03|NAN_SMILES$-0.29|NAN_SMILES$-0.09|[Li+].F[P-](F)(F)(F)(F)F$0.27|-0.19"
+    # smiles= "CCOCCOCCF$0.14|O=C1OCCO1$-0.03|NAN_SMILES$-0.29|NAN_SMILES$-0.09|[Li+].F[P-](F)(F)(F)(F)F$0.27|-0.19"
+    smiles= "CCOCCOCCF"
     max_length = len(smiles)
 
     if attention_config['add_vocab_flag']:
@@ -85,21 +86,23 @@ def main(attention_config):
     attention_mask = encoding["attention_mask"].to(device)
     words = tokenizer.convert_ids_to_tokens(input_ids.squeeze())
 
-    model = DownstreamRegression(drop_rate=0).to(device)
-    checkpoint = torch.load(attention_config['model_path'])
-    model = model.double()
+    outputs = PretrainedModel(input_ids=input_ids, attention_mask=attention_mask, output_attentions=True, output_hidden_states=True)
 
-    model.eval()
-    with torch.no_grad():
-        outputs = model.PretrainedModel(input_ids=input_ids, attention_mask=attention_mask, output_attentions=True)
+    # model = DownstreamRegression(drop_rate=0).to(device)
+    # checkpoint = torch.load(attention_config['model_path'])
+    # model = model.double()
 
+    # model.eval()
+    # with torch.no_grad():
+    #     outputs = model.PretrainedModel(input_ids=input_ids, attention_mask=attention_mask, output_attentions=True, output_hidden_states=True)
+
+    hiddens = outputs['hidden_states']
+    
     regularization = json.load(open("regular.json", "r"))
 
     def Phi(x):
-        last_hidden_state = outputs[0]
-        return last_hidden_state
-    
-    # pdb.set_trace()
+        hidden_state_at_layer = hiddens[6]
+        return hidden_state_at_layer
 
     interpreter = Interpreter(x=input_ids, Phi=Phi, regularization=regularization, words=words).to(device)
 
