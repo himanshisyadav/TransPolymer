@@ -23,9 +23,13 @@ from sklearn.model_selection import KFold
 from rdkit import Chem
 
 from pylab import rcParams
+import matplotlib
 import matplotlib.pyplot as plt
+plt.rcParams['font.family'] = 'Arial'
+from matplotlib import colors as mc
 from matplotlib import rc
 from matplotlib.offsetbox import AnchoredText
+import colorsys
 
 from packaging import version
 
@@ -43,6 +47,8 @@ from copy import deepcopy
 import pdb
 import seaborn as sns
 from sklearn.metrics import mean_absolute_error as mae 
+
+import plotly.express as px
 
 np.random.seed(seed=1)
 
@@ -202,11 +208,8 @@ def test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, s
             temp = batch["temp"].to(device).float()
             prop = batch["prop"].to(device).float()
             outputs = model(input_ids, attention_mask, temp).float()
-            # scaler = load('std_scaler_random_conductivity.bin')
+            scaler = load('std_scaler_random_conductivity.bin')
             # scaler = load('std_scaler_cond_ood_conductivity_log.bin')
-            # scaler = load('std_scaler_ood_common_log_conductivity.bin')
-            # scaler = load('std_scaler_strat_conductivity_common_log.bin')
-            scaler = load('/project/rcc/hyadav/TransPolymer_2/data/new-chemprop-data/ood_test_datasets/std_scaler_ood_common_log_conductivity.bin')
             outputs = torch.from_numpy(scaler.inverse_transform(outputs.cpu().reshape(-1, 1)))
             prop = torch.from_numpy(scaler.inverse_transform(prop.cpu().reshape(-1, 1)))
             loss = loss_fn(outputs.squeeze(), prop.squeeze())
@@ -220,26 +223,6 @@ def test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, s
         print("test RMSE = ", np.sqrt(test_loss))
         print("test r^2 = ", r2_test)
         print("test MAE =", mae_error_test)
-
-    # # Inference Plot
-
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111)
-    # ax.plot(test_true.flatten().to("cpu"),test_pred.flatten().to("cpu"), 'o', color = 'green', markersize = '1')
-    # xl, xr = ax.get_xlim()
-    # yt, yb = ax.get_ylim()
-    # left = xl + 0.5
-    # top = yt + 0.5
-
-    # # Add diagonal line
-    # min_val = min(torch.min(test_true.flatten().to("cpu")), torch.min(test_pred.flatten().to("cpu")))
-    # max_val = max(torch.max(test_true.flatten().to("cpu")), torch.max(test_pred.flatten().to("cpu")))
-    # ax.plot([min_val, max_val], [min_val, max_val], color='red', linestyle='--', label='Diagonal Line')
-
-    # ax.text(left,top, 'RMSE=' + str(round(np.sqrt(test_loss),3)) + ' R2=' + str(round(r2_test,3)) + ' MAE=' + str(round(mae_error_test,3)), ha='left', va='top')
-    # plt.grid(True)
-    # file_name = "./plots/inference_plot_rmse_" + str(np.sqrt(test_loss)) + "_r2_" + str(r2_test) + "_mae_" + str(mae_error_test) + ".png"
-    # plt.savefig(file_name)
 
     #Plots like Ritesh's plots
 
@@ -273,6 +256,10 @@ def test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, s
     figname = "./plots/inference_plot_rmse_" + str(np.sqrt(test_loss)) + "_r2_" + str(r2_test) + "_mae_" + str(mae_error_test) + ".png"
     if figname != None:
         plt.savefig(figname, dpi=300)
+
+    # Lab Consistent Plots
+
+
 
     writer.add_scalar("Loss/test", test_loss, epoch)
     writer.add_scalar("r^2/test", r2_test, epoch)

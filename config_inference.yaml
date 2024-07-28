@@ -7,10 +7,10 @@ model_indicator: 'pretrain'                        # whether to use pretrained m
 aug_indicator:                                     # number of augmentation per SMILES. If no limitation, assign the indicator with None (leave it blank).
 
 vocab_sup_file: 'data/vocab/vocab_sup_PE_I.csv'           # supplementary vocab file path
-train_file: './data/freqII_test_exact_paper_seq_common_log_fusion_scaled_no_mol_new_decimal_2.csv' 
-test_file: './data/freqII_test_exact_paper_seq_common_log_fusion_scaled_no_mol_new_decimal_2.csv'                     # test file path if cross-validation is not used
+train_file: '/project/rcc/hyadav/TransPolymer_2/data/new-chemprop-data/ood_test_datasets/cond_ood_exact_ood_scaled_fusion_no_mol_new_log10.csv' 
+test_file: '/project/rcc/hyadav/TransPolymer_2/data/new-chemprop-data/ood_test_datasets/cond_ood_exact_ood_scaled_fusion_no_mol_new_log10.csv'                     # test file path if cross-validation is not used
 model_path: 'ckpt/pretrain.pt'                      # pretrain model path
-best_model_path: 'ckpt/random_no_mol_scaled_new_linear_huber_5_temp_mul_768_decimal_2_best_model.pt'          # best model save path
+best_model_path: '/project/rcc/hyadav/TransPolymer_2/ckpt/train_strat_exact_all_scaled_fusion_no_mol_new_linear_huber_5_temp_mul_768_best_model.pt'          # best model save path
 
 k: 5                                                # k-fold cross-validation
 blocksize: 411                                      # max length of sequences after tokenization

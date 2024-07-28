@@ -114,7 +114,6 @@ def main(attention_config):
         return_tensors='pt',
     )
 
-    pdb.set_trace()
     input_ids = encoding["input_ids"].to(device)
     attention_mask = encoding["attention_mask"].to(device)
     # temp = encoding["temp"].to(device)
