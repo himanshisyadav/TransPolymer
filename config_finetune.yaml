@@ -7,7 +7,7 @@ model_indicator: 'pretrain'                        # whether to use pretrained m
 aug_indicator:                                     # number of augmentation per SMILES. If no limitation, assign the indicator with None (leave it blank).
 
 vocab_sup_file: './data/vocab/vocab_sup_PE_I.csv'           # supplementary vocab file path
-train_file:  '/project/rcc/hyadav/TransPolymer_2/data/new-chemprop-data/train_strat_exact_all_scaled_nonfusion_no_mol_new.csv'               # train file path
+train_file:  '/project/rcc/hyadav/TransPolymer_3/TransPolymer/data/CE-data/test_CE_exact_all_scaled_nonfusion_no_mol_new.csv'               # train file path
 test_file: '/project/rcc/hyadav/TransPolymer_2/data/new-chemprop-data/test_strat_exact_all_scaled_nonfusion_no_mol_new.csv'                     # test file path if cross-validation is not used
 model_path: './ckpt/pretrain.pt'                      # pretrain model path
 save_path: './ckpt/strat_exact_all_scaled_nonfusion_no_mol_new_huber_5.pt'                     # checkpoint path

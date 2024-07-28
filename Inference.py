@@ -177,11 +177,13 @@ def test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, s
             attention_mask = batch["attention_mask"].to(device)
             prop = batch["prop"].to(device).float()
             outputs = model(input_ids, attention_mask).float()
-            # scaler = load('std_scaler_random_conductivity.bin')
+            scaler = load('std_scaler_random_conductivity.bin')
             # scaler = load('std_scaler_cond_ood_conductivity_log.bin')
             # scaler = load('std_scaler_cood_ood_ce_train_CE.bin')
             # scaler = load('std_scaler_ce_train_CE.bin')
-            scaler = load('std_scaler_strat_conductivity_common_log.bin')
+            # scaler = load('std_scaler_strat_conductivity_common_log.bin')
+            # scaler = load('/project/rcc/hyadav/TransPolymer_2/std_scaler_ood_common_log_conductivity.bin')
+            # scaler = load('/project/rcc/hyadav/TransPolymer_2/std_scaler_cood_ood_ce_CE_target.bin')
             outputs = torch.from_numpy(scaler.inverse_transform(outputs.cpu().reshape(-1, 1)))
             prop = torch.from_numpy(scaler.inverse_transform(prop.cpu().reshape(-1, 1)))
             loss = loss_fn(outputs.squeeze(), prop.squeeze())
@@ -196,6 +198,25 @@ def test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, s
         print("test r^2 = ", r2_test)
         print("test MAE =", mae_error_test)
 
+        errors = np.abs(test_pred.flatten().to("cpu") - test_true.flatten().to("cpu"))
+        results = pd.DataFrame({'Actual': test_pred.flatten().to("cpu"), 'Predicted': test_true.flatten().to("cpu"), 'Error': errors})
+
+        csvname = "./plots/inference_plot_rmse_" + str(np.sqrt(test_loss)) + "_r2_" + str(r2_test) + "_mae_" + str(mae_error_test) + ".csv"
+
+        results.to_csv(csvname, index = True)
+
+
+        # results_sorted = results.sort_values(by='Error')
+
+        # # Best predictions (smallest errors)
+        # best_predictions = results_sorted.head(5)
+
+        # # Worst predictions (largest errors)
+        # worst_predictions = results_sorted.tail(5)
+
+        # print(best_predictions)
+        # print(worst_predictions)
+     
 
     # # Zeros Counts Graph    
     # df = pd.read_csv("./data/study_data/dataset_5.csv")
@@ -438,10 +459,10 @@ def main(finetune_config):
             train_data = DataAug.combine_columns(train_data)
             test_data = DataAug.combine_columns(test_data)
 
-        #Only for random
-        # scaler = StandardScaler()
-        # train_data.iloc[:, 1] = scaler.fit_transform(train_data.iloc[:, 1].values.reshape(-1, 1))
-        # test_data.iloc[:, 1] = scaler.transform(test_data.iloc[:, 1].values.reshape(-1, 1))
+        #Only for random train and test datasets
+        scaler = StandardScaler()
+        train_data.iloc[:, 1] = scaler.fit_transform(train_data.iloc[:, 1].values.reshape(-1, 1))
+        test_data.iloc[:, 1] = scaler.transform(test_data.iloc[:, 1].values.reshape(-1, 1))
 
         train_dataset = Downstream_Dataset(train_data, tokenizer, finetune_config['blocksize'])
         test_dataset = Downstream_Dataset(test_data, tokenizer, finetune_config['blocksize'])

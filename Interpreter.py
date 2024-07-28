@@ -147,7 +147,7 @@ class Interpreter(nn.Module):
         ratios = torch.sigmoid(self.ratio)  # S * 1
         return ratios.detach().cpu().numpy()[:,0] * self.scale
     
-    def visualize(self):
+    def visualize(self, filename):
         """ Visualize the information loss of every word.
         """
         sigma_ = self.get_sigma()
@@ -161,4 +161,4 @@ class Interpreter(nn.Module):
         # cbar = fig.colorbar(cax, orientation='horizontal')
         plt.tight_layout()
         plt.show()
-        plt.savefig("./figs/perturb_pretrain_06_14_24_6.png")
+        plt.savefig(filename)

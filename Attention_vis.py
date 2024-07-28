@@ -72,9 +72,6 @@ def main(attention_config):
     else:
         data = pd.read_csv(attention_config['file_path'])
         smiles = data.values[attention_config['index'],0]
-        # pdb.set_trace()
-
-    # pdb.set_trace()
 
     if attention_config['add_vocab_flag']:
         vocab_sup = pd.read_csv(attention_config['vocab_sup_file'], header=None).values.flatten().tolist()
