@@ -205,10 +205,19 @@ def test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, s
             # scaler = load('std_scaler_random_conductivity.bin')
             # scaler = load('std_scaler_cond_ood_conductivity_log.bin')
             # scaler = load('std_scaler_ood_common_log_conductivity.bin')
-            # scaler = load('std_scaler_strat_conductivity_common_log.bin')
-            scaler = load('/project/rcc/hyadav/TransPolymer_2/data/new-chemprop-data/ood_test_datasets/std_scaler_ood_common_log_conductivity.bin')
-            outputs = torch.from_numpy(scaler.inverse_transform(outputs.cpu().reshape(-1, 1)))
-            prop = torch.from_numpy(scaler.inverse_transform(prop.cpu().reshape(-1, 1)))
+            # scaler = load('/grand/electrolyte-chibueze/hyadav/TransPolymer/data/new-chemprop-data/std_scaler_strat_conductivity_common_log.bin')
+            # scaler = load('/grand/electrolyte-chibueze/hyadav/TransPolymer/data/new-chemprop-data/ood_test_datasets/std_scaler_ood_common_log_conductivity.bin')
+            # sc = load('/grand/electrolyte-chibueze/hyadav/TransPolymer/data/new-chemprop-data/std_scaler_random_conductivity.bin')
+            # sc = load('/grand/electrolyte-chibueze/hyadav/TransPolymer/data/new-chemprop-data/ood_test_datasets/std_scaler_ood_common_log_conductivity.bin')
+            # mean = sc.mean_
+            # std = sc.scale_
+            # outputs = outputs.cpu() * std + mean
+            # prop = prop.cpu() * std + mean
+            # scaler = load('/grand/electrolyte-chibueze/hyadav/TransPolymer/data/new-chemprop-data/ood_test_datasets/std_scaler_ood_common_log_conductivity.bin')
+            # outputs = torch.from_numpy(scaler.inverse_transform(outputs.reshape(-1, 1))) #Add .cpu()
+            # prop = torch.from_numpy(scaler.inverse_transform(prop.cpu().reshape(-1, 1)))
+            outputs = outputs.cpu()
+            prop = prop.cpu()
             loss = loss_fn(outputs.squeeze(), prop.squeeze())
             test_loss += loss.item() * len(prop)
             test_pred = torch.cat([test_pred.to(device), outputs.to(device)])
@@ -486,7 +495,7 @@ if __name__ == "__main__":
     if finetune_config['model_indicator'] == 'pretrain':
         print("Use the pretrained model")
         PretrainedModel = RobertaModel.from_pretrained(finetune_config['model_path'])
-        tokenizer = PolymerSmilesTokenizer.from_pretrained("/project/rcc/hyadav/roberta-base", max_len=finetune_config['blocksize'])
+        tokenizer = PolymerSmilesTokenizer.from_pretrained("/grand/electrolyte-chibueze/hyadav/roberta-base", max_len=finetune_config['blocksize'])
         PretrainedModel.config.hidden_dropout_prob = finetune_config['hidden_dropout_prob']
         PretrainedModel.config.attention_probs_dropout_prob = finetune_config['attention_probs_dropout_prob']
     else:
@@ -501,7 +510,7 @@ if __name__ == "__main__":
             attention_probs_dropout_prob=0.1
         )
         PretrainedModel = RobertaModel(config=config)
-        tokenizer = RobertaTokenizer.from_pretrained("/project/rcc/hyadav/ChemBERTa-77M-MLM", max_len=finetune_config['blocksize'])
+        tokenizer = RobertaTokenizer.from_pretrained("/grand/electrolyte-chibueze/hyadav/roberta-base", max_len=finetune_config['blocksize'])
     max_token_len = finetune_config['blocksize']
 
     """Run the main function"""

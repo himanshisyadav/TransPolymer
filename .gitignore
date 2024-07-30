@@ -7,3 +7,5 @@ ckpt/
 data/electrolyte-data
 data/
 *.bin
+logs/
+__pycache__/*
