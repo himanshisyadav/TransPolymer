@@ -7,3 +7,8 @@ ckpt/
 data/electrolyte-data
 data/
 *.bin
+residual_histogram_final_plots/
+new_plots/
+figs/
+expt_plots_fusion/
+*.csv

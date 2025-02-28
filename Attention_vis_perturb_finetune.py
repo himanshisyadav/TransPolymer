@@ -29,6 +29,8 @@ class DownstreamRegression(nn.Module):
         self.PretrainedModel.resize_token_embeddings(len(tokenizer))
 
         self.pooler = GlobalAveragePooling1D()
+        
+        self.numeric_featurizer = nn.Linear(1, self.PretrainedModel.config.hidden_size)
 
         self.Regressor = nn.Sequential(
             nn.Dropout(drop_rate),

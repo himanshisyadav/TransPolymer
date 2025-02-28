@@ -3,14 +3,17 @@ add_vocab_flag: True                             # whether to add supplementary 
 LLRD_flag: False                                    # whether to use layer-wise lr decay
 aug_flag: False                                     # whether to apply data augmentation
 aug_special_flag: False                            # whether to augment copolymer SMILES
-model_indicator: 'pretrain'                        # whether to use pretrained model
+model_indicator: None                       # whether to use pretrained model
 aug_indicator:                                     # number of augmentation per SMILES. If no limitation, assign the indicator with None (leave it blank).
 
 vocab_sup_file: 'data/vocab/vocab_sup_PE_I.csv'           # supplementary vocab file path
-train_file: '/project/rcc/hyadav/TransPolymer_2/data/new-chemprop-data/ood_test_datasets/cond_ood_exact_ood_scaled_fusion_no_mol_new_log10.csv' 
-test_file: '/project/rcc/hyadav/TransPolymer_2/data/new-chemprop-data/ood_test_datasets/cond_ood_exact_ood_scaled_fusion_no_mol_new_log10.csv'                     # test file path if cross-validation is not used
+train_file: '/project/rcc/hyadav/TransPolymer_2/data/new-chemprop-data/cond_ood_exact_ood_scaled_features_ood_scaled_logs_fusion_no_mol_new_log10_2.csv' 
+test_file: '/project/rcc/hyadav/TransPolymer_2/data/new-chemprop-data/cond_ood_exact_ood_scaled_features_ood_scaled_logs_fusion_no_mol_new_log10_2.csv'                     # test file path if cross-validation is not used
 model_path: 'ckpt/pretrain.pt'                      # pretrain model path
-best_model_path: '/project/rcc/hyadav/TransPolymer_2/ckpt/train_strat_exact_all_scaled_fusion_no_mol_new_linear_huber_5_temp_mul_768_best_model.pt'          # best model save path
+best_model_path: '/project/rcc/hyadav/TransPolymer_2/ckpt/strat_exact_all_scaled_fusion_no_mol_huber_5_no_pretrain_best_model.pt'          # best model save path
+scaler_file: '/project/rcc/hyadav/TransPolymer_2/std_scaler_ood_common_log_conductivity.bin'
+color: 'red'
+figure_name: '/project/rcc/hyadav/TransPolymer_2/new_plots/fig.png'
 
 k: 5                                                # k-fold cross-validation
 blocksize: 411                                      # max length of sequences after tokenization

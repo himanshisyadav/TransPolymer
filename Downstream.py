@@ -42,7 +42,7 @@ writer = SummaryWriter()
 from copy import deepcopy
 
 np.random.seed(seed=1)
-import torchinfo
+# import torchinfo
 
 """Layer-wise learning rate decay"""
 
@@ -210,6 +210,10 @@ def test(model, loss_fn, train_dataloader, test_dataloader, device, scaler, opti
             loss = loss_fn(outputs.squeeze(), prop.squeeze())
             train_loss += loss.item() * len(prop)
             # print("Train Loss: ", train_loss)
+            train_pred = train_pred.float()
+            train_true = train_true.float()
+            outputs = outputs.float()
+            prop = prop.float()
             train_pred = torch.cat([train_pred.to(device), outputs.to(device)])
             train_true = torch.cat([train_true.to(device), prop.to(device)])
 
@@ -228,6 +232,10 @@ def test(model, loss_fn, train_dataloader, test_dataloader, device, scaler, opti
             prop = torch.from_numpy(scaler.inverse_transform(prop.cpu().reshape(-1, 1)))
             loss = loss_fn(outputs.squeeze(), prop.squeeze())
             test_loss += loss.item() * len(prop)
+            test_pred = test_pred.float()
+            test_true = test_true.float()
+            outputs = outputs.float()
+            prop = prop.float()
             test_pred = torch.cat([test_pred.to(device), outputs.to(device)])
             test_true = torch.cat([test_true.to(device), prop.to(device)])
 
@@ -309,9 +317,9 @@ def main(finetune_config):
                 train_data = DataAug.combine_columns(train_data)
                 test_data = DataAug.combine_columns(test_data)
             
-            scaler = StandardScaler()
-            train_data.iloc[:, 2] = scaler.fit_transform(train_data.iloc[:, 2].values.reshape(-1, 1))
-            test_data.iloc[:, 2] = scaler.transform(test_data.iloc[:, 2].values.reshape(-1, 1))
+            # scaler = StandardScaler()
+            # train_data.iloc[:, 2] = scaler.fit_transform(train_data.iloc[:, 2].values.reshape(-1, 1))
+            # test_data.iloc[:, 2] = scaler.transform(test_data.iloc[:, 2].values.reshape(-1, 1))
 
             train_dataset = Downstream_Dataset(train_data, tokenizer, finetune_config['blocksize'])
             test_dataset = Downstream_Dataset(test_data, tokenizer, finetune_config['blocksize'])
@@ -419,7 +427,9 @@ def main(finetune_config):
 
         # dump(scaler, 'std_scaler_random_conductivity.bin', compress=True)
 
-        scaler = load('std_scaler_strat_conductivity_common_log.bin')
+        # scaler = load('std_scaler_strat_conductivity_common_log.bin')
+        # scaler = load('/project/rcc/hyadav/TransPolymer_3/TransPolymer/data/permute_data/std_scaler_rand_conductivity_common_log.bin')s
+        scaler = load(finetune_config['scaler_file'])
 
         train_dataset = Downstream_Dataset(train_data, tokenizer, finetune_config['blocksize'])
         test_dataset = Downstream_Dataset(test_data, tokenizer, finetune_config['blocksize'])
