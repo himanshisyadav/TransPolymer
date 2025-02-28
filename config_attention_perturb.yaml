@@ -1,5 +1,6 @@
 task: 'finetune'                                      # the task to visualize the attention scores
-smiles: 'COCCOC$-1.84|C1COCO1$-0.53|COCCOCC(F)(F)F$6.54|NAN_SMILES$-0.09|[Li+].C(F)(F)(F)S(=O)(=O)[N-]S(=O)(=O)C(F)(F)F$0.27|0.65,0.84'
+# smiles: 'COCCOC$-1.84|C1COCO1$-0.53|COCCOCC(F)(F)F$6.54|NAN_SMILES$-0.09|[Li+].C(F)(F)(F)S(=O)(=O)[N-]S(=O)(=O)C(F)(F)F$0.27|0.65,0.84' #Error is 0.004560
+smiles: 'COCCOC$-0.62|O=C1CCCO1$0.79|NAN_SMILES$-0.29|NAN_SMILES$-0.09|[Li+].[B-](F)(F)(F)F$-1.20|0.14,1.01' #Error is 1.135797
 layer: 6                                              # the hidden layer for visualization when task=='pretrain'
 index: 8                                              # the index of the sequence used for visualization when task=='finetune'
 add_vocab_flag: True                                 # whether to add supplementary vocab

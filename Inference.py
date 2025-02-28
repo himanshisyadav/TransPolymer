@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import sys
+# sys.path.append("/software/python-anaconda-2022.05-el8-x86_64/envs/TransPolymer/lib/python3.9/site-packages/yaml")
 import yaml
 
 from tqdm.auto import tqdm
@@ -41,11 +42,49 @@ from copy import deepcopy
 
 import pdb
 import seaborn as sns
-from sklearn.metrics import mean_absolute_error as mae 
+from sklearn.metrics import mean_absolute_error, mean_squared_error , r2_score
 
 np.random.seed(seed=1)
 
 """Layer-wise learning rate decay"""
+
+def plot_jointplot(df, color, filename = None):
+    color_map = { 
+    'blue': (0, 0.576, 0.902),
+    'green': (0.349,0.745,0.306),
+    'red': (0.984, 0.262, 0.219),
+    'orange': (0.984, 0.713, 0.305),
+    'purple': (0.839, 0.286, 0.604),
+    'anvil': (0.298, 0.78, 0.77),
+    'dark_purple': (0.557, 0, 0.998),
+    'pink': (0.95, 0.78, 0.996),
+    'gray': (0.463,0.463,0.463)
+    }
+    y_true = df['Actual']
+    y_pred = df['Predicted']
+    mae = mean_absolute_error(y_true, y_pred)
+    rmse = np.sqrt(mean_squared_error(y_true, y_pred))
+    r2 = r2_score(y_true, y_pred)
+
+    axmin = min(min(y_true), min(y_pred)) - 0.1*(max(y_true)-min(y_true))
+    axmax = max(max(y_true), max(y_pred)) + 0.1*(max(y_true)-min(y_true))
+
+    g = sns.jointplot(x=y_true, y=y_pred, kind='reg', color=color_map.get(color), xlim=(axmin, axmax), ylim=(axmin, axmax), marginal_kws=dict(kde=True, fill=True), scatter_kws={'edgecolor': 'w', 'linewidths': 0.5})
+    g.ax_joint.set_xlim(axmin, axmax)
+    g.ax_joint.set_ylim(axmin, axmax)
+    x_space = 0.15 * axmax
+    y_space = 0.1 * axmax
+    plt.text(axmin+x_space, axmax-y_space, 'MAE: {:.2f}'.format(mae), fontsize=12, color=color_map.get(color))
+    plt.text(axmin+x_space, axmax-2.5*y_space, 'RMSE: {:.2f}'.format(rmse), fontsize=12, color=color_map.get(color))
+    plt.text(axmin+x_space, axmax-4*y_space, 'R$^2$: {:.2f}'.format(r2), fontsize=12, color=color_map.get(color))
+    plt.ylabel('Predicted log $\sigma$ (log mS cm$^{-1}$)', fontdict={'fontsize': 14})
+    plt.xlabel('True log $\sigma$ (log mS cm$^{-1}$)', fontdict={'fontsize': 14})
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
+    # plt.title(f'Jointplot for {variable_name}')
+    if filename:
+        plt.savefig(filename, dpi=300, transparent=True)
+    print("Saved", filename)
 
 def roberta_base_AdamW_LLRD(model, lr, weight_decay):
     opt_parameters = []  # To be passed to the optimizer (only parameters of the layers you want to update).
@@ -163,7 +202,7 @@ def train(model, optimizer, scheduler, loss_fn, train_dataloader, device):
 
     return None
 
-def test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, scheduler, epoch):
+def test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, scheduler, epoch, color, figure_name):
 
     r2score = R2Score()
     test_loss = 0
@@ -177,34 +216,46 @@ def test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, s
             attention_mask = batch["attention_mask"].to(device)
             prop = batch["prop"].to(device).float()
             outputs = model(input_ids, attention_mask).float()
-            scaler = load('std_scaler_random_conductivity.bin')
+            # scaler = load('/project/rcc/hyadav/TransPolymer_3/TransPolymer/data/permute_data/std_scaler_rand_conductivity_common_log.bin')
             # scaler = load('std_scaler_cond_ood_conductivity_log.bin')
             # scaler = load('std_scaler_cood_ood_ce_train_CE.bin')
             # scaler = load('std_scaler_ce_train_CE.bin')
             # scaler = load('std_scaler_strat_conductivity_common_log.bin')
             # scaler = load('/project/rcc/hyadav/TransPolymer_2/std_scaler_ood_common_log_conductivity.bin')
             # scaler = load('/project/rcc/hyadav/TransPolymer_2/std_scaler_cood_ood_ce_CE_target.bin')
+            # scaler = load('/project/rcc/hyadav/TransPolymer_3/TransPolymer/data/permute_data/std_scaler_rand_conductivity_common_log.bin')
+            scaler = load(finetune_config['scaler_file'])
             outputs = torch.from_numpy(scaler.inverse_transform(outputs.cpu().reshape(-1, 1)))
             prop = torch.from_numpy(scaler.inverse_transform(prop.cpu().reshape(-1, 1)))
             loss = loss_fn(outputs.squeeze(), prop.squeeze())
             test_loss += loss.item() * len(prop)
+            test_pred = test_pred.float()
+            test_true = test_true.float()
+            outputs = outputs.float()
+            prop = prop.float()
             test_pred = torch.cat([test_pred.to(device), outputs.to(device)])
             test_true = torch.cat([test_true.to(device), prop.to(device)])
 
-        test_loss = test_loss / len(test_pred.flatten())
-        r2_test = r2score(test_pred.flatten().to("cpu"), test_true.flatten().to("cpu")).item()
-        mae_error_test = mae(test_true.flatten().to("cpu"), test_pred.flatten().to("cpu")) 
-        print("test RMSE = ", np.sqrt(test_loss))
+        # test_loss = test_loss / len(test_pred.flatten())
+        test_true = test_true.cpu().numpy() 
+        test_pred = test_pred.cpu().numpy() 
+        rmse = np.sqrt(mean_squared_error(test_true, test_pred))
+        # r2_test = r2score(test_pred.flatten().to("cpu"), test_true.flatten().to("cpu")).item()
+        r2_test = r2_score(test_true, test_pred)
+        mae_error_test = mean_absolute_error(test_true, test_pred) 
+        print("test RMSE = ", rmse)
         print("test r^2 = ", r2_test)
         print("test MAE =", mae_error_test)
 
-        errors = np.abs(test_pred.flatten().to("cpu") - test_true.flatten().to("cpu"))
-        results = pd.DataFrame({'Actual': test_pred.flatten().to("cpu"), 'Predicted': test_true.flatten().to("cpu"), 'Error': errors})
 
-        csvname = "./plots/inference_plot_rmse_" + str(np.sqrt(test_loss)) + "_r2_" + str(r2_test) + "_mae_" + str(mae_error_test) + ".csv"
+        errors = np.abs(test_pred - test_true)
+        results = pd.DataFrame({'Actual': test_true.reshape(-1), 'Predicted': test_pred.reshape(-1), 'Error': errors.reshape(-1)})
+
+        csvname = "./plots/inference_plot_rmse_" + str(rmse) + "_r2_" + str(r2_test) + "_mae_" + str(mae_error_test) + ".csv"
 
         results.to_csv(csvname, index = True)
 
+        plot_jointplot(results, color, figure_name)
 
         # results_sorted = results.sort_values(by='Error')
 
@@ -222,8 +273,8 @@ def test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, s
     # df = pd.read_csv("./data/study_data/dataset_5.csv")
     # y = df['zeros_count']
 
-    squared_diff = (test_pred.flatten().to("cpu") - test_true.flatten().to("cpu"))**2
-    rmse_per_point = torch.sqrt(squared_diff)
+    squared_diff = (test_pred- test_true)**2
+    rmse_per_point = np.sqrt(squared_diff)
     x = rmse_per_point
 
     # fig = plt.figure()
@@ -254,14 +305,14 @@ def test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, s
 
     #Plots like Ritesh's plots
 
-    y_true = test_true.flatten().to("cpu")
-    y_pred = test_pred.flatten().to("cpu")
+    y_true = test_true
+    y_pred = test_pred
 
     axmin = min(min(y_true), min(y_pred)) - 0.1*(max(y_true)-min(y_true))
     axmax = max(max(y_true), max(y_pred)) + 0.1*(max(y_true)-min(y_true))
     
     mae_calc = mae_error_test
-    rmse = np.sqrt(test_loss)
+    # rmse = np.sqrt(test_loss)
     r2 = r2_test
     
     plt.plot([axmin, axmax], [axmin, axmax], '--k')
@@ -281,35 +332,36 @@ def test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, s
     
     plt.xlabel('log$_{10}{}\sigma_{Li^+}^{GT}$')
     plt.ylabel('log$_{10}{}\sigma_{Li^+}^{ML}$')
-    figname = "./plots/inference_plot_rmse_" + str(np.sqrt(test_loss)) + "_r2_" + str(r2_test) + "_mae_" + str(mae_error_test) + ".png"
+    figname = "./plots/inference_plot_rmse_" + str(rmse) + "_r2_" + str(r2_test) + "_mae_" + str(mae_error_test) + ".png"
     if figname != None:
         plt.savefig(figname, dpi=300)
 
     # Residuals Histogram Plot
 
     # # Calculate residuals
-    # residuals = test_true.flatten().to("cpu") - test_pred.flatten().to("cpu")
+    residuals = test_true - test_pred
 
-    # # Plot histogram of residuals
-    # plt.figure(figsize=(8, 6))
-    # plt.hist(residuals, bins=20, color='blue', edgecolor='black', alpha=0.7)
-    # plt.xlabel('Residuals')
-    # plt.ylabel('Frequency')
-    # plt.title('Histogram of Residuals')
-    # plt.grid(True)
-    # file_name = "./plots/histogram_plot_rmse_" + str(np.sqrt(test_loss)) + "_r2_" + str(r2_test) + "_mae_" + str(mae_error_test) + ".png"
-    # plt.savefig(file_name)
+    # Plot histogram of residuals
+    plt.figure(figsize=(8, 6))
+    plt.hist(residuals, bins=20, color='blue', edgecolor='black', alpha=0.7)
+    plt.xlabel('Residuals')
+    plt.ylabel('Frequency')
+    plt.title('Histogram of Residuals')
+    plt.grid(True)
+    file_name = "./plots/histogram_plot_rmse_" + str(rmse) + "_r2_" + str(r2_test) + "_mae_" + str(mae_error_test) + ".png"
+    plt.savefig(file_name)
 
-    # # Plot histogram of residuals
-    # plt.figure(figsize=(8, 6))
-    # plt.scatter(test_pred.flatten().to("cpu"), residuals, color='blue', alpha=0.5)
-    # plt.axhline(y=0, color='red', linestyle='--')
-    # plt.xlabel('Fitted Values')
-    # plt.ylabel('Residuals')
-    # plt.title('Residuals vs. Fitted Curve')
-    # plt.grid(True)
-    # file_name = "./plots/check_hetero_plot_rmse_" + str(np.sqrt(test_loss)) + "_r2_" + str(r2_test) + "_mae_" + str(mae_error_test) + ".png"
-    # plt.savefig(file_name)
+    # Plot histogram of residuals
+    plt.figure(figsize=(8, 6))
+    plt.scatter(test_pred, residuals, color='blue', alpha=0.5)
+    plt.axhline(y=0, color='red', linestyle='--')
+    plt.xlabel('Fitted Values')
+    plt.ylabel('Residuals')
+    plt.title('Residual Plot: Unimodal')
+    plt.grid(True)
+    # file_name = "./plots/check_hetero_plot_rmse_" + str(rmse) + "_r2_" + str(r2_test) + "_mae_" + str(mae_error_test) + ".png"
+    file_name = "./residual_histogram_final_plots/residual_ood_ood_scaled_strat_model_nonfusion.png"
+    plt.savefig(file_name)
 
     writer.add_scalar("Loss/test", test_loss, epoch)
     writer.add_scalar("r^2/test", r2_test, epoch)
@@ -459,10 +511,10 @@ def main(finetune_config):
             train_data = DataAug.combine_columns(train_data)
             test_data = DataAug.combine_columns(test_data)
 
-        #Only for random train and test datasets
-        scaler = StandardScaler()
-        train_data.iloc[:, 1] = scaler.fit_transform(train_data.iloc[:, 1].values.reshape(-1, 1))
-        test_data.iloc[:, 1] = scaler.transform(test_data.iloc[:, 1].values.reshape(-1, 1))
+        # #Only for random train and test datasets
+        # scaler = StandardScaler()
+        # train_data.iloc[:, 1] = scaler.fit_transform(train_data.iloc[:, 1].values.reshape(-1, 1))
+        # test_data.iloc[:, 1] = scaler.transform(test_data.iloc[:, 1].values.reshape(-1, 1))
 
         train_dataset = Downstream_Dataset(train_data, tokenizer, finetune_config['blocksize'])
         test_dataset = Downstream_Dataset(test_data, tokenizer, finetune_config['blocksize'])
@@ -504,7 +556,7 @@ def main(finetune_config):
         for epoch in range(finetune_config['num_epochs']):
             print("epoch: %s/%s" % (epoch+1,finetune_config['num_epochs']))
             # train(model, optimizer, scheduler, loss_fn, train_dataloader, device)
-            test_loss, r2_test = test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, scheduler, epoch)
+            test_loss, r2_test = test(model, loss_fn, train_dataloader, test_dataloader, device, optimizer, scheduler, epoch, finetune_config['color'], finetune_config['figure_name'])
 
         writer.flush()
 

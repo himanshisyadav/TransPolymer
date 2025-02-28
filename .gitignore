@@ -9,3 +9,8 @@ figs/
 *.bin
 *.html
 *.pyc
+__pycache__/
+expt_plots_non_fusion/
+final_plots/
+new_plots/
+residual_histogram_final_plots/

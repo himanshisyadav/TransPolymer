@@ -16,6 +16,6 @@
 
 module load python/anaconda-2022.05
 
-source activate TransPolymer
+source activate /project/rcc/hyadav/TransPolymer
 
 python3 tSNE_clusters.py

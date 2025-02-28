@@ -184,6 +184,10 @@ def test(model, loss_fn, train_dataloader, test_dataloader, device, scaler, opti
             prop = torch.from_numpy(scaler.inverse_transform(prop.cpu().reshape(-1, 1)))
             loss = loss_fn(outputs.squeeze(), prop.squeeze())
             train_loss += loss.item() * len(prop)
+            train_pred = train_pred.float()
+            train_true = train_true.float()
+            outputs = outputs.float()
+            prop = prop.float()
             train_pred = torch.cat([train_pred.to(device), outputs.to(device)])
             train_true = torch.cat([train_true.to(device), prop.to(device)])
 
@@ -201,6 +205,10 @@ def test(model, loss_fn, train_dataloader, test_dataloader, device, scaler, opti
             prop = torch.from_numpy(scaler.inverse_transform(prop.cpu().reshape(-1, 1)))
             loss = loss_fn(outputs.squeeze(), prop.squeeze())
             test_loss += loss.item() * len(prop)
+            test_pred = test_pred.float()
+            test_true = test_true.float()
+            outputs = outputs.float()
+            prop = prop.float()
             test_pred = torch.cat([test_pred.to(device), outputs.to(device)])
             test_true = torch.cat([test_true.to(device), prop.to(device)])
 
@@ -387,7 +395,8 @@ def main(finetune_config):
 
         # dump(scaler, 'std_scaler_random_conductivity.bin', compress=True)
         # scaler = load('std_scaler_ce_train_CE.bin')
-        scaler = load('std_scaler_strat_conductivity_common_log.bin')
+        # scaler = load('/project/rcc/hyadav/TransPolymer_3/TransPolymer/data/permute_data/std_scaler_rand_conductivity_common_log.bin')
+        scaler = load(finetune_config['scaler_file'])
 
         train_dataset = Downstream_Dataset(train_data, tokenizer, finetune_config['blocksize'])
         test_dataset = Downstream_Dataset(test_data, tokenizer, finetune_config['blocksize'])
@@ -478,7 +487,7 @@ if __name__ == "__main__":
             attention_probs_dropout_prob=0.1
         )
         PretrainedModel = RobertaModel(config=config)
-        tokenizer = RobertaTokenizer.from_pretrained("/project/rcc/hyadav/ChemBERTa-77M-MLM", max_len=finetune_config['blocksize'])
+        tokenizer = RobertaTokenizer.from_pretrained("/project/rcc/hyadav/roberta-base", max_len=finetune_config['blocksize'])
     max_token_len = finetune_config['blocksize']
 
     """Run the main function"""

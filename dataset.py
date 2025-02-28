@@ -61,8 +61,8 @@ class Downstream_Dataset(Dataset):
 
     def __getitem__(self, i):
         data_row = self.dataset.iloc[i]
-        seq = data_row[0]
-        prop = data_row[1]
+        seq = data_row.iloc[0]
+        prop = data_row.iloc[1]
 
         encoding = self.tokenizer(
             str(seq),
